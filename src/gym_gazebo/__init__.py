@@ -160,3 +160,8 @@ register(
     id='RealMARA3DoF-v0',
     entry_point='gym_gazebo.envs.MARA:RealModularMara3DOFv0Env',
 )
+
+register(
+    id='GazeboAutoVehicle-v0',
+    entry_point='gym_gazebo.envs.auto_vehicle:GazeboAutoVehiclev0Env',
+)

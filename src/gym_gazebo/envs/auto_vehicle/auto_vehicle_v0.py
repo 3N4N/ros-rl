@@ -26,7 +26,43 @@ from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 
 
+
+
+moveBindings = {
+    'i': (1,0,0,0),
+    'o': (1,0,0,-1),
+    'j': (0,0,0,1),
+    'l': (0,0,0,-1),
+    'u': (1,0,0,1),
+    ',': (-1,0,0,0),
+    '.': (-1,0,0,1),
+    'm': (-1,0,0,-1),
+    'O': (1,-1,0,0),
+    'I': (1,0,0,0),
+    'J': (0,1,0,0),
+    'L': (0,-1,0,0),
+    'U': (1,1,0,0),
+    '<': (-1,0,0,0),
+    '>': (-1,-1,0,0),
+    'M': (-1,1,0,0),
+    't': (0,0,1,0),
+    'b': (0,0,-1,0),
+}
+
+speedBindings={
+    'q': (1.1,1.1),
+    'z': (.9,.9),
+    'w': (1.1,1),
+    'x': (.9,1),
+    'e': (1,1.1),
+    'c': (1,.9),
+}
+
+
 IMAGE_TOPIC = "/vehicle_camera/image_raw"
+CMDVEL_TOPIC = "vehicle/cmd_vel"
+
+
 
 
 def get_isolated_region(image):
@@ -162,7 +198,16 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         self.observation_space = spaces.Box(np.array([0]),
                                             np.array([20]),
                                             dtype=np.int32)
-        rospy.Subscriber(IMAGE_TOPIC, Image, self.image_callback)
+        # rospy.Subscriber(IMAGE_TOPIC, Image, self.image_callback)
+        self.vel_pub = rospy.Publisher(CMDVEL_TOPIC, Twist, queue_size=5)
+
+        self.x = 0
+        self.y = 0
+        self.z = 0
+        self.th = 0.0
+        self.speed = 0.3
+        self.turn = 0.1
+
 
     def image_callback(*msg):
         print("Received an image!")
@@ -190,12 +235,48 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         return [seed]
 
     def step(self, action):
-        # if action == 0:
-        #     print("action 0")
-        # elif action == 1:
-        #     print("action 1")
-        # elif action == 2:
-        #     print("action 2")
+        key = 'z'
+        if action == 0:
+            print("action 0")
+            key = 'i'
+            self.speed = 0.05
+            self.turn = 0.4
+        elif action == 1:
+            print("action 1")
+            key = 'u'
+            self.speed = 0.5
+            self.turn = 0.0
+        elif action == 2:
+            key = 'o'
+            print("action 2")
+            self.speed = 0.05
+            self.turn = 0.4
+
+
+        if key in moveBindings.keys():
+            self.x = moveBindings[key][0]
+            self.y = moveBindings[key][1]
+            self.z = moveBindings[key][2]
+            self.th = moveBindings[key][3]
+        elif key in speedBindings.keys():
+            self.speed = self.speed * speedBindings[key][0]
+            self.turn  = self.turn  * speedBindings[key][1]
+
+        twist = Twist()
+        # Copy state into twist message.
+        twist.linear.x = self.x * self.speed
+        twist.linear.y = self.y * self.speed
+        twist.linear.z = self.z * self.speed
+        twist.angular.x = 0
+        twist.angular.y = 0
+        twist.angular.z = self.th * self.turn
+
+        print("-----------------------------")
+        print(action, key)
+        print(twist)
+        print("-----------------------------")
+
+        self.vel_pub.publish(twist)
 
         reward = 1
         done = False

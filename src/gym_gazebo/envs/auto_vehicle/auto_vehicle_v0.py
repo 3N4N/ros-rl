@@ -146,7 +146,7 @@ def process_image(image):
 
     slope = (vanishing_point[0] - (width // 2)) / (vanishing_point[1] - height)
     slope = math.degrees(math.atan(slope))
-    slope = (slope + 90) // 9
+    slope = int((slope + 90) / 9)
     print(slope, end="\n\n")
 
 
@@ -197,12 +197,17 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         # elif action == 2:
         #     print("action 2")
 
-        # obs = np.random.randint(*self.observation_space.shape)
-        obs = tuple(self.observation_space.sample())
         reward = 1
         done = False
-        self.data = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
-        obs = self.data
+
+        # obs = tuple(self.observation_space.sample())
+        msg = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
+
+        bridge = CvBridge()
+        image = bridge.imgmsg_to_cv2(msg, "bgr8")
+
+        slope = process_image(image)
+        obs = slope
         return obs, reward, done, {}
 
     def reset(self):

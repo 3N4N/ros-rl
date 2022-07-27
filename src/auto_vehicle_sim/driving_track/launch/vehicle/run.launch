@@ -2,12 +2,21 @@
 <launch>
   <env name="GAZEBO_MODEL_PATH" value="$(find driving_track):$(find vehicle_gazebo)"/>
 
+
+  <arg name="world" default="empty" />
+  <arg name="paused" default="false" />
+  <arg name="use_sim_time" default="true" />
+  <arg name="gui" default="true" />
+  <arg name="headless" default="false" />
+  <arg name="debug" default="false" />
+
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
    <arg name="world_name" value="$(find driving_track)/worlds/road_track.world"/>
-   <arg name="use_sim_time" value="true"/>
-   <arg name="verbose" value="true"/>
-   <!-- <arg name="gui" value="false"/> -->
-    <!-- more default parameters can be changed here -->
+    <arg name="paused" default="$(arg paused)" />
+    <arg name="use_sim_time" default="$(arg use_sim_time)" />
+    <arg name="gui" default="$(arg gui)" />
+    <arg name="headless" default="$(arg headless)" />
+    <arg name="debug" default="$(arg debug)" />
   </include>
 
 </launch>

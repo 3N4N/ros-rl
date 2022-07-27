@@ -6,6 +6,8 @@ import numpy as np
 import copy
 import math
 import os
+import atexit
+
 from gym import utils, spaces
 from gym_gazebo.envs import gazebo_env
 from gym.utils import seeding
@@ -200,6 +202,8 @@ def process_image(imgmsg):
 class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
     def __init__(self):
         print("==========================================")
+        atexit.register(self.cleanup)
+
         # Launch the simulation with the given launchfile name
         gazebo_env.GazeboEnv.__init__(self, "GazeboAutoVehicle_v0.launch")
         self.action_space = spaces.Discrete(3)
@@ -208,7 +212,8 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
                                             dtype=np.int32)
         # rospy.Subscriber(IMAGE_TOPIC, Image, self.image_callback)
         self.vel_pub = rospy.Publisher(CMDVEL_TOPIC, Twist, queue_size=5)
-        self.reset_proxy = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+        rospy.wait_for_service(GZRESET_TOPIC)
+        self.reset_proxy = rospy.ServiceProxy(GZRESET_TOPIC, Empty, persistent=True)
 
         self.x = 0
         self.y = 0
@@ -217,6 +222,8 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         self.speed = 0.3
         self.turn = 0.1
 
+    def cleanup(self):
+        self.reset_proxy.close()
 
     def image_callback(*msg):
         print("Received an image!")

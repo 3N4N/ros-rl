@@ -38,6 +38,13 @@ def simulate():
                 # Do action and get result
                 next_state, reward, done, _ = env.step(action)
                 total_reward += reward
+                print("next_state: ", next_state)
+                print("total_reward: ", total_reward)
+
+                # When episode is done, print reward
+                if done or t >= MAX_TRY:
+                    print("Episode %d finished after %i time steps with total reward = %f." % (episode, t, total_reward))
+                    break
 
                 # Get correspond q value from state, action pair
                 q_value = q_table[state][action]
@@ -51,11 +58,6 @@ def simulate():
 
                 # Draw games
                 env.render()
-
-                # When episode is done, print reward
-                if done or t >= MAX_TRY:
-                    print("Episode %d finished after %i time steps with total reward = %f." % (episode, t, total_reward))
-                    break
 
             # exploring rate decay
             if epsilon >= 0.005:

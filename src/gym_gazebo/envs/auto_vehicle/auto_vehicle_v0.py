@@ -24,6 +24,7 @@ import traceback
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
+from std_srvs.srv import Empty
 
 
 
@@ -103,8 +104,8 @@ def process_image(image):
     # Hough Transform, to find those white pixels from isolated region into actual lines
     # DRAWING LINES: (order of params) --> region of interest, bin size (P, theta), min intersections needed, placeholder array,
     lines = cv2.HoughLinesP(isolated_region, 2, np.pi / 180, 100, np.array([]), minLineLength=40, maxLineGap=5)
-    print(lines)
-    print()
+
+    print("houghlines: ", lines)
 
     img_center = width // 2
     thres = 5
@@ -128,12 +129,15 @@ def process_image(image):
             right_points.append([line[0], line[1]])
             right_points.append([line[2], line[3]])
 
-    print(left_lines)
-    print(right_lines)
+    print("left lines: ", left_lines)
+    print("right lines: ", right_lines)
     print()
-    print(left_points)
-    print(right_points)
+    print("left points: ", left_points)
+    print("right points: ", right_points)
     print()
+
+    if left_lines == [] or right_lines == []:
+        return None
 
 
     # FIXME: this is too hacky
@@ -155,8 +159,8 @@ def process_image(image):
             right_lane[3] = point[1]
 
 
-    print(left_lane)
-    print(right_lane)
+    print("left lane: ", left_lane)
+    print("right lane: ", right_lane)
 
     x1 = left_lane[0];
     y1 = left_lane[1];
@@ -178,12 +182,12 @@ def process_image(image):
            / ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)));
 
     vanishing_point = [int(i) for i in vanishing_point]
-    print(vanishing_point)
+    print("vanishing point: ", vanishing_point)
 
     slope = (vanishing_point[0] - (width // 2)) / (vanishing_point[1] - height)
     slope = math.degrees(math.atan(slope))
     slope = int((slope + 90) / 9)
-    print(slope, end="\n\n")
+    print("SLOPE: ", slope, end="\n\n")
 
 
     return slope
@@ -200,6 +204,7 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
                                             dtype=np.int32)
         # rospy.Subscriber(IMAGE_TOPIC, Image, self.image_callback)
         self.vel_pub = rospy.Publisher(CMDVEL_TOPIC, Twist, queue_size=5)
+        self.reset_proxy = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
 
         self.x = 0
         self.y = 0
@@ -289,10 +294,18 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
 
         slope = process_image(image)
         obs = slope
+
+        if slope == None or slope > 18 or slope < 2:
+            print("SLOPE", slope)
+            done = True
+
         return obs, reward, done, {}
 
     def reset(self):
         # obs = tuple(self.observation_space.sample())
+
+        print("======================= RESETTING ==================")
+        self.reset_proxy()
         msg = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
 
         bridge = CvBridge()

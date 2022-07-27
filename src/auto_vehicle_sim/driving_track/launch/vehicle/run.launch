@@ -6,7 +6,7 @@
    <arg name="world_name" value="$(find driving_track)/worlds/road_track.world"/>
    <arg name="use_sim_time" value="true"/>
    <arg name="verbose" value="true"/>
-   <arg name="gui" value="false"/>
+   <!-- <arg name="gui" value="false"/> -->
     <!-- more default parameters can be changed here -->
   </include>
 

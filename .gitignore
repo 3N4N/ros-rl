@@ -4,3 +4,6 @@ devel
 logs
 venv
 .catkin_tools
+
+Session.vim
+*.vim

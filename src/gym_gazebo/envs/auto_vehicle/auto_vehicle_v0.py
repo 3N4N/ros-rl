@@ -64,6 +64,7 @@ speedBindings={
 
 IMAGE_TOPIC = "/vehicle_camera/image_raw"
 CMDVEL_TOPIC = "vehicle/cmd_vel"
+GZRESET_TOPIC = "/gazebo/reset_world"
 
 
 
@@ -268,6 +269,9 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
             self.speed = 0.05
             self.turn = 0.4
 
+        # self.speed = 0.5
+        # self.turn = 0.0
+
 
         if key in moveBindings.keys():
             self.x = moveBindings[key][0]
@@ -313,6 +317,8 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         # obs = tuple(self.observation_space.sample())
 
         print("======================= RESETTING ==================")
+        # FIXME: after reset, the received image isn't up to date
+        # FIX: use /reset_world instead of /reset_simulation
         self.reset_proxy()
         msg = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
 

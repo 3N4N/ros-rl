@@ -77,7 +77,11 @@ def get_isolated_region(image):
     mask = cv2.bitwise_and(image, mask)
     return mask
 
-def process_image(image):
+def process_image(imgmsg):
+    bridge = CvBridge()
+    image = bridge.imgmsg_to_cv2(imgmsg, "bgr8")
+    cv2.imwrite("canny.png", image)
+
     # percent by which the image is resized
     scale_percent = 100
 
@@ -289,10 +293,7 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         # obs = tuple(self.observation_space.sample())
         msg = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
 
-        bridge = CvBridge()
-        image = bridge.imgmsg_to_cv2(msg, "bgr8")
-
-        slope = process_image(image)
+        slope = process_image(msg)
         obs = slope
 
         if slope == None or slope > 18 or slope < 2:
@@ -308,10 +309,7 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         self.reset_proxy()
         msg = rospy.wait_for_message(IMAGE_TOPIC, Image, timeout=5)
 
-        bridge = CvBridge()
-        image = bridge.imgmsg_to_cv2(msg, "bgr8")
-
-        slope = process_image(image)
+        slope = process_image(msg)
         obs = slope
 
         return obs

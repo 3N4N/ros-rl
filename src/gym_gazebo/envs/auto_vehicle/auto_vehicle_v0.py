@@ -112,7 +112,10 @@ def process_image(imgmsg):
     # DRAWING LINES: (order of params) --> region of interest, bin size (P, theta), min intersections needed, placeholder array,
     lines = cv2.HoughLinesP(isolated_region, 2, np.pi / 180, 100, np.array([]), minLineLength=40, maxLineGap=5)
 
-    print("houghlines: ", lines)
+    if lines == []:
+        print("lines == []")
+        print(lines)
+        return None
 
     img_center = width // 2
     thres = 5
@@ -126,7 +129,6 @@ def process_image(imgmsg):
 
     for line in lines:
         line = line[0]
-        # print(line[0], line[1], line[2], line[3])
         if line[0] < img_center + thres and line[2] < img_center + thres:
             left_lines.append(line.tolist())
             left_points.append([line[0], line[1]])
@@ -194,7 +196,8 @@ def process_image(imgmsg):
     slope = (vanishing_point[0] - (width // 2)) / (vanishing_point[1] - height)
     slope = math.degrees(math.atan(slope))
     slope = int((slope + 90) / 9)
-    print("SLOPE: ", slope, end="\n\n")
+    print("SLOPE: ", slope)
+    print("-----------------------------")
 
 
     return slope
@@ -256,17 +259,17 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         if action == 0:
             print("action 0")
             key = 'i'
-            self.speed = 0.05
+            self.speed = 0.5
             self.turn = 0.4
         elif action == 1:
             print("action 1")
             key = 'u'
-            self.speed = 0.5
+            self.speed = 0.8
             self.turn = 0.0
         elif action == 2:
             key = 'o'
             print("action 2")
-            self.speed = 0.05
+            self.speed = 0.5
             self.turn = 0.4
 
         # self.speed = 0.5
@@ -307,9 +310,12 @@ class GazeboAutoVehiclev0Env(gazebo_env.GazeboEnv):
         slope = process_image(msg)
         obs = slope
 
-        if slope == None or slope > 18 or slope < 2:
+        if slope != None and slope > 7 and slope < 14:
+            reward = 5
+        elif slope == None or slope > 18 or slope < 2:
             print("SLOPE", slope)
             done = True
+            reward = -10
 
         return obs, reward, done, {}
 

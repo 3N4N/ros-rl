@@ -19,7 +19,7 @@ def simulate():
     # while not rospy.is_shutdown():
     try:
         for episode in range(1, MAX_EPISODES):
-            print("lsdkfjsldkfjsldkfjsldkfjsldkfjsldkfjsldfkj")
+            print("============= STARTING NEW EPISODE ===============")
 
             # Init environment
             state = env.reset()
@@ -28,6 +28,7 @@ def simulate():
 
             # AI tries up to MAX_TRY times
             for t in range(1, MAX_TRY):
+                time.sleep(1)
 
                 # In the beginning, do random action to learn
                 if random.uniform(0, 1) < epsilon:
@@ -47,6 +48,7 @@ def simulate():
                     break
 
                 # Get correspond q value from state, action pair
+                print("state: ", state)
                 q_value = q_table[state][action]
                 best_q = np.max(q_table[next_state])
 

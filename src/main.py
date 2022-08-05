@@ -31,7 +31,6 @@ def simulate():
             # Init environment
             state = env.reset()
             total_reward = 0
-            print(state)
 
             for t in range(1, MAX_TRY):
                 # time.sleep(1)
@@ -93,13 +92,14 @@ class GazeboAutoVehicleEnv():
         bridge = CvBridge()
         image = bridge.imgmsg_to_cv2(img, "bgr8")
         gray = bridge.imgmsg_to_cv2(img, "mono8")
-        cv.imwrite("canny.png", image)
-        H,W = gray.shape
-        print(H,W)
-
         _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY);
+
+        H,W = gray.shape
         clipped = gray[int(H*2/3):, :]
-        print(clipped.shape)
+
+        cv.imwrite("gray.png", gray)
+        cv.imwrite("clipped.png", clipped)
+
         cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped);
 
         if cnt < 3:
@@ -147,6 +147,7 @@ class GazeboAutoVehicleEnv():
         print(twist)
         print("-----------------------------")
 
+        self.unpause()
         self.vel_pub.publish(twist)
 
         reward = 1
@@ -154,6 +155,7 @@ class GazeboAutoVehicleEnv():
 
         # obs = tuple(self.observation_space.sample())
         msg = rospy.wait_for_message(self.IMAGE_TOPIC, Image, timeout=5)
+        self.pause()
 
         slope = self._process_image(msg)
         obs = slope
@@ -171,7 +173,11 @@ class GazeboAutoVehicleEnv():
         print("======================= RESETTING ==================")
 
         self.reset_proxy()
+
+        self.unpause()
+        time.sleep(1)
         msg = rospy.wait_for_message(self.IMAGE_TOPIC, Image, timeout=5)
+        self.pause()
 
         slope = self._process_image(msg)
         obs = slope
@@ -186,16 +192,15 @@ if __name__ == "__main__":
     env = GazeboAutoVehicleEnv()
 
     MAX_EPISODES = 9999
-    MAX_TRY = 1000
+    MAX_TRY = 100000
     epsilon = 1
     epsilon_decay = 0.999
     learning_rate = 0.1
     gamma = 0.6
     num_box = tuple((env.observation_space.high + np.ones(env.observation_space.shape)).astype(int))
-    print(np.array(num_box).shape)
-    # print(env.action_space.n, num_box)
     q_table = np.zeros(num_box + (env.action_space.n,))
-    print(q_table.shape)
-    print(env.observation_space.high)
-    print(env.observation_space)
+    print("num_box.shape:", np.array(num_box).shape)
+    print("q_table.shape:", q_table.shape)
+    print(env.observation_space.high, env.observation_space)
+
     simulate()

@@ -68,7 +68,8 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>12.95 32.7</size>
+              <!-- <size>12.95 32.7</size> -->
+              <size>20 20</size>
             </plane>
           </geometry>
           <material>

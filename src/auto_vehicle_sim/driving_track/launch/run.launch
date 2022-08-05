@@ -23,7 +23,7 @@
     pkg="gazebo_ros"
     type="spawn_model"
     args="-file $(find vehicle_gazebo)/models/vehicle.sdf
-      -x 3.84
+      -x 8
       -y -0.5
       -z 0
       -R 0

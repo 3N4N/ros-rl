@@ -46,6 +46,8 @@ def simulate():
                 total_reward += reward
                 print("next_state: ", next_state)
                 print("total_reward: ", total_reward)
+                print("EPISODE:", episode)
+                print("TRY:", t)
 
                 if done or t >= MAX_TRY:
                     print("Episode %d finished after %i time steps with total reward = %f." % (episode, t, total_reward))

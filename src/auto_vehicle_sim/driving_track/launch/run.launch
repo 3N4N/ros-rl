@@ -22,7 +22,6 @@
     name="spawn_urdf"
     pkg="gazebo_ros"
     type="spawn_model"
-
     args="-file $(find vehicle_gazebo)/models/vehicle.sdf
       -x 3.84
       -y -0.5
@@ -32,4 +31,5 @@
       -Y -1.57
       -sdf
       -model vehicle"/>
+
 </launch>

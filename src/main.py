@@ -1,3 +1,10 @@
+# FIXME:
+# The car performs well.
+# But the q_table doesn't make sense.
+# np.argmax(q_table) should be [0, 1, 2, X] (X is don't-care).
+# But it's [2, 1, 0, X].
+
+
 import gym
 import random
 import time
@@ -21,15 +28,17 @@ def interuppt_handler(signum, frame):
 
 
 
-def simulate(env):
-    global epsilon, epsilon_decay
-    # while not rospy.is_shutdown():
+def simulate(env, q_table, alpha, epsilon, epsilon_decay):
     try:
         for episode in range(1, MAX_EPISODES):
             print("============= STARTING NEW EPISODE ===============")
 
             state = env.reset()
             total_reward = 0
+
+            if state == None:
+                episode -= 1
+                continue
 
             for t in range(1, MAX_TRY):
                 # In the beginning, do random action to learn
@@ -40,51 +49,64 @@ def simulate(env):
 
                 next_state, reward, done, _ = env.step(action)
                 total_reward += reward
-                print("next_state: ", next_state)
-                print("total_reward: ", total_reward)
+                print("-----------------------------")
                 print("EPISODE:", episode)
                 print("TRY:", t)
+                print("STATE: ", state)
+                print("NEXT STATE: ", next_state)
+                print("REWARD: ", reward)
+                print("TOTAL REWARD: ", total_reward)
+                print("EPSILON:", epsilon)
+                print("-----------------------------")
+
+                if next_state == None:
+                    next_state = env.observation_space.high
+
+                prev_q = q_table[state][action]
+                best_max = np.max(q_table[next_state])
+
+                # Q(state, action) <- (1 - a)Q(state, action) + a(reward + rmaxQ(next state, all actions))
+                q_table[state][action] = (1 - alpha) * prev_q + alpha * (reward + gamma * best_max)
+
+                state = next_state
 
                 if done or t >= MAX_TRY:
                     print("Episode %d finished after %i time steps with total reward = %f." % (episode, t, total_reward))
                     break
 
-                print("STATE: ", state)
-                q_value = q_table[state][action]
-                best_q = np.max(q_table[next_state])
 
-                # Q(state, action) <- (1 - a)Q(state, action) + a(reward + rmaxQ(next state, all actions))
-                q_table[state][action] = (1 - learning_rate) * q_value + learning_rate * (reward + gamma * best_q)
-
-                state = next_state
-
-            # exploring rate decay
             if epsilon >= 0.005:
                 epsilon *= epsilon_decay
+
+            if episode % 50 == 0:
+                np.save("qtable-"+str(episode)+".npy", q_table)
+
     except KeyboardInterrupt:
         pass
 
 
 
 class GazeboAutoVehicleEnv():
-    def __init__(self):
+    def __init__(self, H, W):
         self.IMAGE_TOPIC = "/vehicle_camera/image_raw"
         self.CMDVEL_TOPIC = "vehicle/cmd_vel"
         self.GZRESET_TOPIC = "/gazebo/reset_world"
-        # self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
-        # self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
+        self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
+        self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
+
+        self.H,self.W = H,W
 
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(np.array([0]),
-                                            np.array([20]),
+                                            np.array([3]),
                                             dtype=np.int32)
         rospy.init_node('gym', anonymous=True)
         rospy.Subscriber(self.IMAGE_TOPIC, Image, self.image_callback)
         self.vel_pub = rospy.Publisher(self.CMDVEL_TOPIC, Twist, queue_size=5)
         rospy.wait_for_service(self.GZRESET_TOPIC)
         self.reset_proxy = rospy.ServiceProxy(self.GZRESET_TOPIC, Empty)
-        # self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
-        # self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
+        self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
+        self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
 
     def image_callback(self, img):
         self.slope = self._process_image(img)
@@ -96,8 +118,7 @@ class GazeboAutoVehicleEnv():
         gray = bridge.imgmsg_to_cv2(img, "mono8")
         _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY);
 
-        H,W = gray.shape
-        clipped = gray[int(H*2/3):, :]
+        clipped = gray[int(self.H*2/3):, :]
 
         cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped);
 
@@ -110,7 +131,7 @@ class GazeboAutoVehicleEnv():
         right_lane = []
 
         for cent in centroids:
-            dist = cent[0] - W / 2
+            dist = cent[0] - self.W / 2
             if dist < dist_left_lane:
                 dist_left_lane = dist
                 left_lane = cent
@@ -123,14 +144,23 @@ class GazeboAutoVehicleEnv():
         if left_lane == [] or right_lane == [] or (left_lane == right_lane).all():
             return None
 
+        if left_lane[0] < 30 or right_lane[0] > self.W - 30:
+            return None
+
         goal_x = int((left_lane[0] + right_lane[0]) / 2)
         goal_y = int((left_lane[1] + right_lane[1]) / 2)
-        error = goal_x - W / 2
-        slope = int((error * (180 / W) + 90) / 9)
+        error = goal_x - self.W / 2
 
+        if error <= -20:
+            slope = 0
+        elif -20 < error < 20:
+            slope = 1
+        elif error >= 20:
+            slope = 2
 
         clipped = cv.cvtColor(clipped, cv.COLOR_GRAY2RGB)
         cv.circle(clipped,(goal_x, goal_y), 2, (0,255,0), 2)
+        cv.circle(clipped,(int(self.W/2), goal_y), 2, (255,0,0), 2)
 
         cv.imshow("clipped", clipped)
         cv.waitKey(1)
@@ -146,7 +176,7 @@ class GazeboAutoVehicleEnv():
         if action == 0:
             self.turn = -0.2
         elif action == 1:
-            self.speed = 0.5
+            self.speed = 0.3
         elif action == 2:
             self.turn = 0.2
 
@@ -155,30 +185,30 @@ class GazeboAutoVehicleEnv():
         twist.linear.x = self.speed
         twist.angular.z = self.turn
 
-        print("-----------------------------")
-        print(action)
-        print(twist)
-        print("-----------------------------")
-
-        # self.unpause()
+        self.unpause()
         self.vel_pub.publish(twist)
+        self.pause()
 
-        reward = 1
-        done = False
-
-        # obs = tuple(self.observation_space.sample())
-        # msg = rospy.wait_for_message(self.IMAGE_TOPIC, Image, timeout=5)
-        # self.pause()
-
-        # slope = self._process_image(msg)
         slope = self.slope
         obs = slope
 
+        print("-----------------------------")
+        print("SLOPE:", slope)
+        print("ACTION:", action)
+        # print(twist)
+        print("-----------------------------")
+
         if slope != None:
-            reward = 5
-        elif slope == None:
+            done = False
+            if action == self.prev_slope:
+                reward = 10
+            else:
+                reward = -10
+        else:
             done = True
-            reward = -10
+            reward = -10000
+
+        self.prev_slope = slope
 
         return obs, reward, done, {}
 
@@ -187,14 +217,14 @@ class GazeboAutoVehicleEnv():
 
         self.reset_proxy()
 
-        # self.unpause()
+        self.unpause()
         time.sleep(1)
-        # msg = rospy.wait_for_message(self.IMAGE_TOPIC, Image, timeout=5)
-        # self.pause()
+        self.pause()
 
-        # slope = self._process_image(msg)
         slope = self.slope
         obs = slope
+
+        self.prev_slope = slope
 
         return obs
 
@@ -203,18 +233,22 @@ class GazeboAutoVehicleEnv():
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, interuppt_handler)
 
-    env = GazeboAutoVehicleEnv()
+    env = GazeboAutoVehicleEnv(600, 800)
 
     MAX_EPISODES = 9999
     MAX_TRY = 100000
     epsilon = 1
-    epsilon_decay = 0.999
-    learning_rate = 0.1
+    epsilon_decay = 0.9
+    # epsilon = 0.1
+    # epsilon_decay = 1
+    alpha = 0.1
     gamma = 0.6
     num_box = tuple((env.observation_space.high + np.ones(env.observation_space.shape)).astype(int))
     q_table = np.zeros(num_box + (env.action_space.n,))
+    # q_table = np.zeros([env.observation_space.low, env.action_space.n])
     print("num_box.shape:", np.array(num_box).shape)
     print("q_table.shape:", q_table.shape)
+    print("num_box", num_box)
     print(env.observation_space.high, env.observation_space)
 
-    simulate(env)
+    simulate(env, q_table, alpha, epsilon, epsilon_decay)

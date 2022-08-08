@@ -17,6 +17,7 @@ import cv2 as cv
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
+from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
@@ -40,7 +41,9 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 episode -= 1
                 continue
 
-            for t in range(1, MAX_TRY):
+            done = False
+
+            while not done:
                 # In the beginning, do random action to learn
                 if random.uniform(0, 1) < epsilon:
                     action = env.action_space.sample()
@@ -51,7 +54,6 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 total_reward += reward
                 print("-----------------------------")
                 print("EPISODE:", episode)
-                print("TRY:", t)
                 print("STATE: ", state)
                 print("NEXT STATE: ", next_state)
                 print("REWARD: ", reward)
@@ -68,10 +70,13 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 # Q(state, action) <- (1 - a)Q(state, action) + a(reward + rmaxQ(next state, all actions))
                 q_table[state][action] = (1 - alpha) * prev_q + alpha * (reward + gamma * best_max)
 
+                best_actions = [np.argmax(q_table[state]) for state in range(q_table.shape[0])]
+                print("Best actions:", best_actions)
+
                 state = next_state
 
-                if done or t >= MAX_TRY:
-                    print("Episode %d finished after %i time steps with total reward = %f." % (episode, t, total_reward))
+                if done:
+                    print("Episode %d finished with total reward = %f." % (episode, total_reward))
                     break
 
 
@@ -93,8 +98,10 @@ class GazeboAutoVehicleEnv():
         self.GZRESET_TOPIC = "/gazebo/reset_world"
         self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
         self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
+        self.MODEL_TOPIC = '/gazebo/model_states'
 
         self.H,self.W = H,W
+        self.finished = False
 
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(np.array([0]),
@@ -102,7 +109,9 @@ class GazeboAutoVehicleEnv():
                                             dtype=np.int32)
         rospy.init_node('gym', anonymous=True)
         rospy.Subscriber(self.IMAGE_TOPIC, Image, self.image_callback)
+        rospy.Subscriber(self.MODEL_TOPIC, ModelStates, self.modelstate_callback)
         self.vel_pub = rospy.Publisher(self.CMDVEL_TOPIC, Twist, queue_size=5)
+
         rospy.wait_for_service(self.GZRESET_TOPIC)
         self.reset_proxy = rospy.ServiceProxy(self.GZRESET_TOPIC, Empty)
         self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
@@ -111,6 +120,13 @@ class GazeboAutoVehicleEnv():
     def image_callback(self, img):
         self.slope = self._process_image(img)
         pass
+
+    def modelstate_callback(self, states):
+        pose = states.pose[states.name.index("vehicle")].position
+        goal_x, goal_y = 0.0, 5.0
+        if pose.x > goal_x and pose.y > goal_y:
+            print("FINISHED!")
+            self.finished = True
 
     def _process_image(self, img):
         bridge = CvBridge()
@@ -171,7 +187,7 @@ class GazeboAutoVehicleEnv():
 
 
     def step(self, action):
-        self.speed = 0.3
+        self.speed = 0.2
         self.turn = 0.0
         if action == 0:
             self.turn = 0.2
@@ -209,6 +225,8 @@ class GazeboAutoVehicleEnv():
             reward = -10000
 
         self.prev_slope = slope
+        if self.finished:
+            done = True
 
         return obs, reward, done, {}
 
@@ -216,6 +234,7 @@ class GazeboAutoVehicleEnv():
         print("======================= RESETTING ==================")
 
         self.reset_proxy()
+        self.finished = False
 
         self.unpause()
         time.sleep(1)
@@ -236,7 +255,6 @@ if __name__ == "__main__":
     env = GazeboAutoVehicleEnv(600, 800)
 
     MAX_EPISODES = 9999
-    MAX_TRY = 100000
     epsilon = 1
     epsilon_decay = 0.9
     # epsilon = 0.1

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <env name="GAZEBO_MODEL_PATH" value="$(find driving_track)/models:$(find vehicle_gazebo)"/>
+  <env name="GAZEBO_MODEL_PATH" value="$(find driving_track)/models:$(find vehicle_gazebo):$(env GAZEBO_MODEL_PATH)"/>
 
   <arg name="world" default="empty" />
   <arg name="paused" default="false" />

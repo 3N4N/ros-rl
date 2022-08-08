@@ -42,7 +42,8 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>12.95 32.7</size>
+              <!-- <size>12.95 32.7</size> -->
+              <size>20 20</size>
             </plane>
           </geometry>
           <surface>
@@ -119,43 +120,13 @@
           <wrench>0 0 0 0 -0 0</wrench>
         </link>
       </model>
-      <model name='vehicle'>
-        <pose>3.83986 -0.499601 0.324989 9e-06 9e-06 -1.56974</pose>
-        <scale>1 1 1</scale>
-        <link name='camera_link'>
-          <pose>3.8409 -1.49961 0.824981 9e-06 9e-06 -1.56974</pose>
-          <velocity>7e-06 0.001232 0.000662 -0.001514 -9e-06 -3e-06</velocity>
-          <acceleration>0.008161 2.43954 1.32439 -3.02788 -0.016645 -0.021855</acceleration>
-          <wrench>0.008161 2.43954 1.32439 0 -0 0</wrench>
-        </link>
-        <link name='caster'>
-          <pose>3.83885 0.457538 0.199998 0.007587 0.036258 -1.56986</pose>
-          <velocity>2.3e-05 0.000259 -0.002317 0.001164 -0.000243 0</velocity>
-          <acceleration>0.071981 0.492716 -4.63394 0 -0 0</acceleration>
-          <wrench>0.071981 0.492716 -4.63394 0 -0 0</wrench>
-        </link>
-        <link name='chassis'>
-          <pose>3.83969 -0.348176 0.499991 9e-06 9e-06 -1.56974</pose>
-          <velocity>1.2e-05 0.000744 -0.001078 -0.001518 -7e-06 -3e-06</velocity>
-          <acceleration>0.036643 1.46198 -2.15631 -0.919712 -0.039942 -0.02338</acceleration>
-          <wrench>0.041918 1.67243 -2.46671 0 -0 0</wrench>
-        </link>
-        <link name='left_wheel'>
-          <pose>4.46547 -1.05323 0.29999 -1.57069 -0.001821 -1.56974</pose>
-          <velocity>-1e-06 0.000451 0 -0.001505 -3e-06 -3e-06</velocity>
-          <acceleration>-0.001586 0.866775 0.000779 2.90815 -0.005977 -0.020073</acceleration>
-          <wrench>-0.003172 1.73355 0.001557 0 -0 0</wrench>
-        </link>
-        <link name='right_wheel'>
-          <pose>3.21541 -1.05454 0.299979 -1.57069 -0.000763 -1.56974</pose>
-          <velocity>7e-06 0.000449 -0 -0.001499 2.3e-05 -1.4e-05</velocity>
-          <acceleration>0.014304 0.883715 0.000529 2.84355 0.046449 -0.037565</acceleration>
-          <wrench>0.028608 1.76743 0.001058 0 -0 0</wrench>
-        </link>
-      </model>
       <light name='sun'>
         <pose>0 0 10 0 -0 0</pose>
       </light>
     </state>
+    <include>
+      <uri>model://mailbox</uri>
+      <pose>0 6 0 0 0 0</pose>
+    </include>
   </world>
 </sdf>

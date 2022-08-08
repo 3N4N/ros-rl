@@ -122,9 +122,9 @@ class GazeboAutoVehicleEnv():
         pass
 
     def modelstate_callback(self, states):
-        pose = states.pose[states.name.index("vehicle")].position
-        goal_x, goal_y = 0.0, 5.0
-        if pose.x > goal_x and pose.y > goal_y:
+        vehicle_pose = states.pose[states.name.index("vehicle")].position
+        goal_pose = states.pose[states.name.index("Mailbox")].position
+        if vehicle_pose.x > goal_pose.x and vehicle_pose.y > goal_pose.y:
             print("FINISHED!")
             self.finished = True
 
@@ -187,7 +187,7 @@ class GazeboAutoVehicleEnv():
 
 
     def step(self, action):
-        self.speed = 0.2
+        self.speed = 0.3
         self.turn = 0.0
         if action == 0:
             self.turn = 0.2

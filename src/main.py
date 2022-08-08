@@ -174,11 +174,11 @@ class GazeboAutoVehicleEnv():
         self.speed = 0.3
         self.turn = 0.0
         if action == 0:
-            self.turn = -0.2
-        elif action == 1:
-            self.speed = 0.3
-        elif action == 2:
             self.turn = 0.2
+        elif action == 1:
+            self.speed = 0.5
+        elif action == 2:
+            self.turn = -0.2
 
 
         twist = Twist()

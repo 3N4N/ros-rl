@@ -1,10 +1,3 @@
-# FIXME:
-# The car performs well.
-# But the q_table doesn't make sense.
-# np.argmax(q_table) should be [0, 1, 2, X] (X is don't-care).
-# But it's [2, 1, 0, X].
-
-
 import gym
 import random
 import time

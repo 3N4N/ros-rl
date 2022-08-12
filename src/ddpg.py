@@ -53,6 +53,7 @@ class GazeboAutoVehicleEnv(gym.Env):
         self.slope = None
 
     def image_callback(self, img):
+        # print("Img callback")
         self.slope = self._process_image(img)
         pass
 
@@ -67,11 +68,11 @@ class GazeboAutoVehicleEnv(gym.Env):
         bridge = CvBridge()
         image = bridge.imgmsg_to_cv2(img, "bgr8")
         gray = bridge.imgmsg_to_cv2(img, "mono8")
-        _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY);
+        _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY)
 
         clipped = gray[int(self.H*2/3):, :]
 
-        cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped);
+        cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped)
 
         if cnt < 3:
             return None
@@ -118,8 +119,10 @@ class GazeboAutoVehicleEnv(gym.Env):
 
 
     def step(self, action):
+        print(type(action[0]))
         self.speed = 0.5
-        self.turn = action
+
+        self.turn = action[0].item()
         # if action == 0:
         #     self.turn = 0.2
         # elif action == 1:
@@ -141,7 +144,7 @@ class GazeboAutoVehicleEnv(gym.Env):
 
         print("-----------------------------")
         print("SLOPE:", slope)
-        print("ACTION:", action)
+        print("ACTION:", action[0].item())
         # print(twist)
         print("-----------------------------")
 
@@ -155,17 +158,17 @@ class GazeboAutoVehicleEnv(gym.Env):
         if self.finished:
             done = True
 
-        if obs == None:
+        if slope == None:
             obs = env.observation_space.high
 
         return obs, reward, done, {}
 
     def reset(self):
         print("======================= RESETTING ==================")
-
+        
         self.reset_proxy()
         self.finished = False
-
+        # print("Reset proxy called - reset")
         # self.unpause()
         # time.sleep(0.5)
         # self.pause()
@@ -173,12 +176,12 @@ class GazeboAutoVehicleEnv(gym.Env):
         slope = None
         while slope is None:
             slope = self.slope
-
+        # print("Slope found! - reset")
         obs = np.asarray([slope], dtype=self.observation_space.dtype)
 
         if obs == None:
             obs = self.observation_space.high
-
+        # print("Returning - reset")
         return obs
 
 
@@ -203,7 +206,7 @@ check_env(env)
 n_actions = env.action_space.shape[-1]
 action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
-model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1)
+model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, buffer_size = 100)
 model.learn(total_timesteps=10000, log_interval=10)
 model.save("ddpg_pendulum")
 env = model.get_env()

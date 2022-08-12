@@ -1,3 +1,5 @@
+import signal
+import sys
 import time
 import gym
 import numpy as np
@@ -14,6 +16,12 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
+
+
+
+def interuppt_handler(signum, frame):
+    print("Signal handler!!!")
+    sys.exit(-2) #Terminate process here as catching the signal removes the close process behaviour of Ctrl-C
 
 
 class GazeboAutoVehicleEnv(gym.Env):
@@ -165,7 +173,7 @@ class GazeboAutoVehicleEnv(gym.Env):
 
     def reset(self):
         print("======================= RESETTING ==================")
-        
+
         self.reset_proxy()
         self.finished = False
         # print("Reset proxy called - reset")
@@ -187,6 +195,7 @@ class GazeboAutoVehicleEnv(gym.Env):
 
 
 
+signal.signal(signal.SIGINT, interuppt_handler)
 
 # env = gym.make("Pendulum-v1")
 

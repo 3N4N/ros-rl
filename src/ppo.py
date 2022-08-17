@@ -5,12 +5,11 @@ import gym
 import numpy as np
 import cv2 as cv
 
-from stable_baselines3 import DDPG
+from stable_baselines3 import PPO
 from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 from stable_baselines3.common.env_checker import check_env
 
 import rospy
-from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
@@ -18,11 +17,6 @@ from std_srvs.srv import Empty
 
 from util import _process_image, interuppt_handler
 
-
-
-def interuppt_handler(signum, frame):
-    print("Signal handler!!!")
-    sys.exit(-2) #Terminate process here as catching the signal removes the close process behaviour of Ctrl-C
 
 
 class GazeboAutoVehicleEnv(gym.Env):
@@ -62,7 +56,7 @@ class GazeboAutoVehicleEnv(gym.Env):
         self.slope = None
 
     def image_callback(self, img):
-        self.slope = _process_image(img)
+        self.slope = _process_image(img, False)
         pass
 
     def modelstate_callback(self, states):
@@ -71,7 +65,6 @@ class GazeboAutoVehicleEnv(gym.Env):
         if vehicle_pose.x > goal_pose.x and vehicle_pose.y > goal_pose.y:
             print("FINISHED!")
             self.finished = True
-
 
     def step(self, action):
         print(type(action[0]))
@@ -109,12 +102,11 @@ class GazeboAutoVehicleEnv(gym.Env):
         else:
             done = True
             reward = -10000
+            slope = self.prev_slope
+            obs = np.asarray([slope], dtype=self.observation_space.dtype)
 
         if self.finished:
             done = True
-
-        if slope == None:
-            obs = env.observation_space.high
 
         return obs, reward, done, {}
 
@@ -131,11 +123,10 @@ class GazeboAutoVehicleEnv(gym.Env):
         slope = None
         while slope is None:
             slope = self.slope
-        # print("Slope found! - reset")
+
+        self.prev_slope = self.slope
         obs = np.asarray([slope], dtype=self.observation_space.dtype)
 
-        if obs == None:
-            obs = self.observation_space.high
         # print("Returning - reset")
         return obs
 
@@ -148,21 +139,19 @@ if __name__ == "__main__":
     env = GazeboAutoVehicleEnv(600, 800)
     check_env(env)
 
-    # The noise objects for DDPG
-    n_actions = env.action_space.shape[-1]
-    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log='logs/tensorboard')
+    model.learn(total_timesteps=10000)
+    print("Model learned.")
 
-    model = DDPG("MlpPolicy", env, action_noise=action_noise, verbose=1, buffer_size = 100)
-    model.learn(total_timesteps=10000, log_interval=10)
-
-    model_name = "model_ddpg"
+    model_name = "model_ppo"
     model.save(model_name)
     env = model.get_env()
     del model # remove to demonstrate saving and loading
 
-    model = DDPG.load(model_name)
+    model = PPO.load(model_name)
 
     # obs = env.reset()
     # while True:
     #     action, _states = model.predict(obs)
     #     obs, rewards, dones, info = env.step(action)
+

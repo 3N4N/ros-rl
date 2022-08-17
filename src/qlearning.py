@@ -14,6 +14,7 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
+from util import _process_image, interuppt_handler
 
 
 def interuppt_handler(signum, frame):
@@ -106,7 +107,15 @@ class GazeboAutoVehicleEnv():
         self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
 
     def image_callback(self, img):
-        self.slope = self._process_image(img)
+        slope = _process_image(img)
+        error = slope * (self.W / 180)
+
+        if error <= -20:
+            self.state = 0
+        elif -20 < error < 20:
+            self.state = 1
+        elif error >= 20:
+            self.state = 2
 
     def modelstate_callback(self, states):
         vehicle_pose = states.pose[states.name.index("vehicle")].position
@@ -114,56 +123,6 @@ class GazeboAutoVehicleEnv():
         if vehicle_pose.x > goal_pose.x and vehicle_pose.y > goal_pose.y:
             print("FINISHED!")
             self.finished = True
-
-    def _process_image(self, img):
-        bridge = CvBridge()
-        image = bridge.imgmsg_to_cv2(img, "bgr8")
-        gray = bridge.imgmsg_to_cv2(img, "mono8")
-        _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY);
-
-        clipped = gray[int(self.H*2/3):, :]
-
-        cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped);
-
-        if cnt < 3:
-            return None
-
-        distances = [x[0] - self.W/2 for x in centroids]
-        left_lane = centroids[distances.index(min(distances))]
-        right_lane = centroids[distances.index(max(distances))]
-
-        # print("LANES:", left_lane, right_lane)
-
-        if len(left_lane) == 0 or len(right_lane) == 0 or (left_lane == right_lane).all():
-            return None
-
-        if left_lane[0] < 30 or right_lane[0] > self.W - 30:
-            return None
-
-        goal_x = int((left_lane[0] + right_lane[0]) / 2)
-        goal_y = int((left_lane[1] + right_lane[1]) / 2 + self.H*2/3)
-        error = goal_x - self.W / 2
-
-        if error <= -20:
-            slope = 0
-        elif -20 < error < 20:
-            slope = 1
-        elif error >= 20:
-            slope = 2
-
-
-        pt0 = (int(self.W/2), self.H)
-        pt1 = (goal_x, goal_y)
-        pt2 = (int(self.W/2), goal_y)
-
-        cv.arrowedLine(image, pt0, pt1, (0,255,0), 2, 8, 0, 0.1)
-        cv.arrowedLine(image, pt0, pt2, (255,0,0), 2, 8, 0, 0.1)
-
-        cv.imwrite("image.png", image)
-        cv.imshow("image", image)
-        cv.waitKey(1)
-
-        return slope
 
 
     def step(self, action):
@@ -185,17 +144,17 @@ class GazeboAutoVehicleEnv():
         self.vel_pub.publish(twist)
         self.pause()
 
-        slope = self.slope
-        obs = slope
+        state = self.state
+        obs = state
 
         print("-----------------------------")
-        print("SLOPE:", slope)
+        print("STATE:", state)
         print("ACTION:", action)
         print("-----------------------------")
 
-        if slope != None:
+        if state != None:
             done = False
-            if action == self.prev_slope:
+            if action == self.prev_state:
                 reward = 10
             else:
                 reward = -10
@@ -203,7 +162,7 @@ class GazeboAutoVehicleEnv():
             done = True
             reward = -10000
 
-        self.prev_slope = slope
+        self.prev_state = state
         if self.finished:
             done = True
 
@@ -219,10 +178,10 @@ class GazeboAutoVehicleEnv():
         time.sleep(1)
         self.pause()
 
-        slope = self.slope
-        obs = slope
+        state = self.state
+        obs = state
 
-        self.prev_slope = slope
+        self.prev_state = state
 
         return obs
 

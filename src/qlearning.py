@@ -57,21 +57,16 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 if next_state == None:
                     next_state = env.observation_space.high
 
-                prev_q = q_table[state][action]
-                best_max = np.max(q_table[next_state])
-
-                # Q(state, action) <- (1 - a)Q(state, action) + a(reward + rmaxQ(next state, all actions))
-                q_table[state][action] = (1 - alpha) * prev_q + alpha * (reward + gamma * best_max)
+                # Q(s, a) <- (1 - α) * Q(s, a) + α * (r + γ + max(Q(s', a)))
+                q_table[state][action] = (1 - alpha) * q_table[state][action] \
+                                       + alpha * (reward + gamma * np.max(q_table[next_state]))
 
                 best_actions = [np.argmax(q_table[state]) for state in range(q_table.shape[0])]
                 print("Best actions:", best_actions)
 
                 state = next_state
 
-                if done:
-                    print("Episode %d finished with total reward = %f." % (episode, total_reward))
-                    break
-
+            print("Episode %d finished with total reward = %f." % (episode, total_reward))
 
             if epsilon >= 0.005:
                 epsilon *= epsilon_decay
@@ -112,7 +107,6 @@ class GazeboAutoVehicleEnv():
 
     def image_callback(self, img):
         self.slope = self._process_image(img)
-        pass
 
     def modelstate_callback(self, states):
         vehicle_pose = states.pose[states.name.index("vehicle")].position
@@ -134,30 +128,20 @@ class GazeboAutoVehicleEnv():
         if cnt < 3:
             return None
 
-        dist_left_lane = 0
-        dist_right_lane = 0
-        left_lane = []
-        right_lane = []
-
-        for cent in centroids:
-            dist = cent[0] - self.W / 2
-            if dist < dist_left_lane:
-                dist_left_lane = dist
-                left_lane = cent
-            if dist > dist_right_lane:
-                dist_right_lane = dist
-                right_lane = cent
+        distances = [x[0] - self.W/2 for x in centroids]
+        left_lane = centroids[distances.index(min(distances))]
+        right_lane = centroids[distances.index(max(distances))]
 
         # print("LANES:", left_lane, right_lane)
 
-        if left_lane == [] or right_lane == [] or (left_lane == right_lane).all():
+        if len(left_lane) == 0 or len(right_lane) == 0 or (left_lane == right_lane).all():
             return None
 
         if left_lane[0] < 30 or right_lane[0] > self.W - 30:
             return None
 
         goal_x = int((left_lane[0] + right_lane[0]) / 2)
-        goal_y = int((left_lane[1] + right_lane[1]) / 2)
+        goal_y = int((left_lane[1] + right_lane[1]) / 2 + self.H*2/3)
         error = goal_x - self.W / 2
 
         if error <= -20:
@@ -167,14 +151,17 @@ class GazeboAutoVehicleEnv():
         elif error >= 20:
             slope = 2
 
-        clipped = cv.cvtColor(clipped, cv.COLOR_GRAY2RGB)
-        cv.circle(clipped,(goal_x, goal_y), 2, (0,255,0), 2)
-        cv.circle(clipped,(int(self.W/2), goal_y), 2, (255,0,0), 2)
 
-        cv.imshow("clipped", clipped)
+        pt0 = (int(self.W/2), self.H)
+        pt1 = (goal_x, goal_y)
+        pt2 = (int(self.W/2), goal_y)
+
+        cv.arrowedLine(image, pt0, pt1, (0,255,0), 2, 8, 0, 0.1)
+        cv.arrowedLine(image, pt0, pt2, (255,0,0), 2, 8, 0, 0.1)
+
+        cv.imwrite("image.png", image)
+        cv.imshow("image", image)
         cv.waitKey(1)
-        cv.imwrite("gray.png", gray)
-        cv.imwrite("clipped.png", clipped)
 
         return slope
 
@@ -204,7 +191,6 @@ class GazeboAutoVehicleEnv():
         print("-----------------------------")
         print("SLOPE:", slope)
         print("ACTION:", action)
-        # print(twist)
         print("-----------------------------")
 
         if slope != None:
@@ -256,7 +242,6 @@ if __name__ == "__main__":
     gamma = 0.6
     num_box = tuple((env.observation_space.high + np.ones(env.observation_space.shape)).astype(int))
     q_table = np.zeros(num_box + (env.action_space.n,))
-    # q_table = np.zeros([env.observation_space.low, env.action_space.n])
     print("num_box.shape:", np.array(num_box).shape)
     print("q_table.shape:", q_table.shape)
     print("num_box", num_box)

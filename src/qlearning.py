@@ -14,6 +14,9 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 from util import _process_image, interuppt_handler
 
 
@@ -24,12 +27,15 @@ def interuppt_handler(signum, frame):
 
 
 def simulate(env, q_table, alpha, epsilon, epsilon_decay):
+    rewards = []
+    avgrewards = []
     try:
         for episode in range(1, MAX_EPISODES):
             print("============= STARTING NEW EPISODE ===============")
 
             state = env.reset()
             total_reward = 0
+            total_steps = 0
 
             if state == None:
                 episode -= 1
@@ -53,6 +59,8 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 print("REWARD: ", reward)
                 print("TOTAL REWARD: ", total_reward)
                 print("EPSILON:", epsilon)
+                # print("REWARDS:", rewards)
+                print("AVG REWARDS:", avgrewards)
                 print("-----------------------------")
 
                 if next_state == None:
@@ -66,14 +74,23 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 print("Best actions:", best_actions)
 
                 state = next_state
+                total_steps += 1
 
             print("Episode %d finished with total reward = %f." % (episode, total_reward))
+            rewards.append(total_reward)
+            avgrewards.append(np.mean(rewards))
 
             if epsilon >= 0.005:
                 epsilon *= epsilon_decay
 
-            if episode % 50 == 0:
-                np.save("qtable-"+str(episode)+".npy", q_table)
+            # if episode % 10 == 0:
+            #     np.save("qtable-"+str(episode)+".npy", q_table)
+            #     np.save("reward-"+str(episode)+".npy", np.array(rewards))
+
+        plt.plot(np.array(avgrewards))
+        plt.xlabel("No. of Episodes")
+        plt.ylabel("Avg. Rewards")
+        plt.show()
 
     except KeyboardInterrupt:
         pass
@@ -85,8 +102,8 @@ class GazeboAutoVehicleEnv():
         self.IMAGE_TOPIC = "/vehicle_camera/image_raw"
         self.CMDVEL_TOPIC = "vehicle/cmd_vel"
         self.GZRESET_TOPIC = "/gazebo/reset_world"
-        self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
-        self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
+        # self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
+        # self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
         self.MODEL_TOPIC = '/gazebo/model_states'
 
         self.H,self.W = H,W
@@ -103,12 +120,16 @@ class GazeboAutoVehicleEnv():
 
         rospy.wait_for_service(self.GZRESET_TOPIC)
         self.reset_proxy = rospy.ServiceProxy(self.GZRESET_TOPIC, Empty)
-        self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
-        self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
+        # self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
+        # self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
 
     def image_callback(self, img):
-        slope = _process_image(img)
-        error = slope * (self.W / 180)
+        state = _process_image(img, True)
+        if state == None:
+            self.state = None
+            return
+
+        error = state * (self.W / 180)
 
         if error <= -20:
             self.state = 0
@@ -140,9 +161,9 @@ class GazeboAutoVehicleEnv():
         twist.linear.x = self.speed
         twist.angular.z = self.turn
 
-        self.unpause()
+        # self.unpause()
         self.vel_pub.publish(twist)
-        self.pause()
+        # self.pause()
 
         state = self.state
         obs = state
@@ -155,12 +176,12 @@ class GazeboAutoVehicleEnv():
         if state != None:
             done = False
             if action == self.prev_state:
-                reward = 10
+                reward = 1
             else:
-                reward = -10
+                reward = -1
         else:
             done = True
-            reward = -10000
+            reward = -1e2
 
         self.prev_state = state
         if self.finished:
@@ -174,13 +195,15 @@ class GazeboAutoVehicleEnv():
         self.reset_proxy()
         self.finished = False
 
-        self.unpause()
+        # self.unpause()
         time.sleep(1)
-        self.pause()
+        # self.pause()
 
-        state = self.state
+        state = None
+        while state is None:
+            state = self.state
+
         obs = state
-
         self.prev_state = state
 
         return obs
@@ -192,7 +215,7 @@ if __name__ == "__main__":
 
     env = GazeboAutoVehicleEnv(600, 800)
 
-    MAX_EPISODES = 9999
+    MAX_EPISODES = 100
     epsilon = 1
     epsilon_decay = 0.9
     # epsilon = 0.1

@@ -129,7 +129,7 @@ class GazeboAutoVehicleEnv():
             self.state = None
             return
 
-        error = state * (self.W / 180)
+        error = state * 90 * (self.W / 180)
 
         if error <= -20:
             self.state = 0

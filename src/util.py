@@ -43,16 +43,16 @@ def _process_image(img, show_image=True):
     slope = error * (180.0 / W)
 
     clipped = cv.cvtColor(clipped, cv.COLOR_GRAY2RGB)
-    pt0 = (int(W/2), H)
+    pt0 = (int(W/2), int(H/3))
     pt1 = (goal_x, goal_y)
     pt2 = (int(W/2), goal_y)
 
     cv.arrowedLine(clipped, pt0, pt1, (0,255,0), 2, 8, 0, 0.03)
     cv.arrowedLine(clipped, pt0, pt2, (255,0,0), 2, 8, 0, 0.03)
 
+    cv.imwrite("clipped.png", clipped)
     if show_image:
-        cv.imwrite("clipped.png", clipped)
         cv.imshow("clipped", clipped)
         cv.waitKey(1)
 
-    return slope
+    return slope/90.0

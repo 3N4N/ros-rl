@@ -245,6 +245,8 @@ class DDPGAgent:
         gamma: float = 0.99,
         tau: float = 5e-3,
         initial_random_steps: int = 1e4,
+        lr_actor: float = 3e-4,
+        lr_critic: float = 1e-3
     ):
         """Initialize."""
         obs_dim = env.observation_space.shape[0]
@@ -275,8 +277,8 @@ class DDPGAgent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # optimizer
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=3e-4)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=1e-3)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr_critic)
 
         # transition to store in memory
         self.transition = list()
@@ -550,7 +552,9 @@ agent = DDPGAgent(
     noise,
     gamma,
     tau,
-    initial_random_steps=initial_random_steps
+    initial_random_steps,
+    lr_actor=3e-4,
+    lr_critic=1e-3
 )
 
 agent.train(num_frames, 1000)

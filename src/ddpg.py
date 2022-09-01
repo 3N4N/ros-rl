@@ -300,7 +300,7 @@ class DDPGAgent:
             ).detach().cpu().numpy()
 
         # add noise for exploration during training
-        if not self.is_test:
+        if not self.is_test and self.noise is not None:
             noise = self.noise()
             selected_action = np.clip(selected_action + noise, -1.0, 1.0)
 
@@ -350,6 +350,7 @@ class DDPGAgent:
         self.critic_optimizer.step()
 
         # train actor
+        # https://ai.stackexchange.com/questions/22618/why-is-the-policy-loss-the-mean-of-qs-mus-in-the-ddpg-algorithm
         actor_loss = -self.critic(state, self.actor(state)).mean()
 
         self.actor_optimizer.zero_grad()
@@ -361,7 +362,7 @@ class DDPGAgent:
 
         return actor_loss.data, critic_loss.data
 
-    def train(self, num_frames: int, plotting_interval: int = 200):
+    def train(self, num_frames: int):
         """Train the agent."""
         self.is_test = False
 
@@ -393,13 +394,7 @@ class DDPGAgent:
                 actor_losses.append(actor_loss)
                 critic_losses.append(critic_loss)
 
-            # # if self.total_step % plotting_interval == 0:
-        # self._plot(
-            # self.total_step,
-            # scores,
-            # actor_losses,
-            # critic_losses,
-        # )
+        self._plot(self.total_step, scores, actor_losses, critic_losses)
 
         self.env.close()
 
@@ -453,7 +448,7 @@ class DDPGAgent:
             plt.plot(values)
 
         subplot_params = [
-            (131, f"frame {frame_idx}. score: {np.mean(scores[-50:])}", scores),
+            (131, f"frame {frame_idx}. score: {np.mean(scores[-10:])}", scores),
             (132, "actor_loss", actor_losses),
             (133, "critic_loss", critic_losses),
         ]
@@ -550,6 +545,7 @@ agent = DDPGAgent(
     memory_size,
     batch_size,
     noise,
+    # None,
     gamma,
     tau,
     initial_random_steps,

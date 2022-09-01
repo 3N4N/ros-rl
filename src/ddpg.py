@@ -7,10 +7,6 @@ import signal
 import sys
 import time
 
-from stable_baselines3 import DDPG
-from stable_baselines3.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
-from stable_baselines3.common.env_checker import check_env
-
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
@@ -89,7 +85,47 @@ class ReplayBuffer:
         return self.size
 
 
-class OUNoise:
+
+class ActionNoise():
+    """
+    The action noise base class
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def reset(self) -> None:
+        """
+        call end of episode reset for the noise
+        """
+        pass
+
+    def __call__(self) -> np.ndarray:
+        raise NotImplementedError()
+
+
+
+class NormalActionNoise(ActionNoise):
+    """
+    A Gaussian action noise
+
+    :param mean: the mean value of the noise
+    :param sigma: the scale of the noise (std here)
+    """
+
+    def __init__(self, mean: np.ndarray, sigma: np.ndarray):
+        self._mu = mean
+        self._sigma = sigma
+        super().__init__()
+
+    def __call__(self) -> np.ndarray:
+        return self.sample()
+
+    def sample(self) -> np.ndarray:
+        return np.random.normal(self._mu, self._sigma)
+
+
+class OUNoise(ActionNoise):
     """Ornstein-Uhlenbeck process.
     Taken from Udacity deep-reinforcement-learning github repository:
     https://github.com/udacity/deep-reinforcement-learning/blob/master/ddpg-pendulum/ddpg_agent.py
@@ -112,6 +148,9 @@ class OUNoise:
     def reset(self):
         """Reset the internal state (= noise) to mean (mu)."""
         self.state = copy.copy(self.mu)
+
+    def __call__(self) -> np.ndarray:
+        return self.sample()
 
     def sample(self) -> np.ndarray:
         """Update internal state and return it as a noise sample."""
@@ -206,8 +245,7 @@ class DDPGAgent:
         env: gym.Env,
         memory_size: int,
         batch_size: int,
-        ou_noise_theta: float,
-        ou_noise_sigma: float,
+        noise: ActionNoise,
         gamma: float = 0.99,
         tau: float = 5e-3,
         initial_random_steps: int = 1e4,
@@ -223,12 +261,7 @@ class DDPGAgent:
         self.tau = tau
         self.initial_random_steps = initial_random_steps
 
-        # noise
-        self.noise = OUNoise(
-            action_dim,
-            theta=ou_noise_theta,
-            sigma=ou_noise_sigma,
-        )
+        self.noise = noise
 
         # device: cpu / gpu
         self.device = torch.device(
@@ -270,7 +303,7 @@ class DDPGAgent:
 
         # add noise for exploration during training
         if not self.is_test:
-            noise = self.noise.sample()
+            noise = self.noise()
             selected_action = np.clip(selected_action + noise, -1.0, 1.0)
 
         self.transition = [state, selected_action]
@@ -342,6 +375,7 @@ class DDPGAgent:
         score = 0
 
         for self.total_step in range(1, num_frames + 1):
+            print("STEP:", self.total_step)
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -361,14 +395,13 @@ class DDPGAgent:
                 actor_losses.append(actor_loss)
                 critic_losses.append(critic_loss)
 
-            # # plotting
             # if self.total_step % plotting_interval == 0:
-            #     self._plot(
-            #         self.total_step,
-            #         scores,
-            #         actor_losses,
-            #         critic_losses,
-            #     )
+        self._plot(
+            self.total_step,
+            scores,
+            actor_losses,
+            critic_losses,
+        )
 
         self.env.close()
 
@@ -422,12 +455,11 @@ class DDPGAgent:
             plt.plot(values)
 
         subplot_params = [
-            (131, f"frame {frame_idx}. score: {np.mean(scores[-10:])}", scores),
+            (131, f"frame {frame_idx}. score: {np.mean(scores[-50:])}", scores),
             (132, "actor_loss", actor_losses),
             (133, "critic_loss", critic_losses),
         ]
 
-        clear_output(True)
         plt.figure(figsize=(30, 5))
         for loc, title, values in subplot_params:
             subplot(loc, title, values)
@@ -486,8 +518,6 @@ np.random.seed(seed)
 seed_torch(seed)
 env.seed(seed)
 
-"""## Initialize"""
-
 # parameters
 num_frames = 50000
 memory_size = 100000
@@ -495,23 +525,27 @@ batch_size = 128
 ou_noise_theta = 1.0
 ou_noise_sigma = 0.1
 gamma = 0.6
-tau = 0.005
+tau = 0.01
 initial_random_steps = 10000
+
+noise = OUNoise(
+    size = env.action_space.shape[0],
+    mu = 0.0,
+    theta = 1.0,
+    sigma = 0.1,
+)
 
 agent = DDPGAgent(
     env,
     memory_size,
     batch_size,
-    ou_noise_theta,
-    ou_noise_sigma,
+    noise,
     gamma,
     tau,
     initial_random_steps=initial_random_steps
 )
 
-"""## Train"""
-
-agent.train(num_frames)
+agent.train(num_frames, 1000)
 
 text = input("Training finished. Wanna test?")
 

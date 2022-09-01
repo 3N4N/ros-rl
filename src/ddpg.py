@@ -3,9 +3,8 @@ DDPG implementation for autonomous vehicle with ROS and Gazebo
 algo source: https://github.com/MrSyee/pg-is-all-you-need
 """
 
-import signal
-import sys
-import time
+from util import interuppt_handler
+from envs import GazeboAutoVehicleEnv
 
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
@@ -14,10 +13,7 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
-from util import interuppt_handler
-from envs import GazeboAutoVehicleEnv
-
-
+import signal
 import copy
 import random
 from typing import Dict, List, Tuple
@@ -332,9 +328,8 @@ class DDPGAgent:
         done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
 
         # XXX: should mask be used? we return -ve reward for collision anyway.
-        # Answer: yes, bc these are sampled values, so reward may not be
-        # corresponding to the proper status of done. simply inverting the sign
-        # will do the trick.
+        # Answer: yes, bc this mask ensures the reward of a next state after
+        # done is true isn't added. it has nothing do w/ -ve reward.
         mask = 1 - done
         next_value = self.critic_target(next_state, self.actor_target(next_state))
         curr_return = reward + self.gamma * next_value * mask
@@ -376,6 +371,7 @@ class DDPGAgent:
 
         for self.total_step in range(1, num_frames + 1):
             print("STEP:", self.total_step)
+            print("TOTAL SCORES:", scores)
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -395,13 +391,13 @@ class DDPGAgent:
                 actor_losses.append(actor_loss)
                 critic_losses.append(critic_loss)
 
-            # if self.total_step % plotting_interval == 0:
-        self._plot(
-            self.total_step,
-            scores,
-            actor_losses,
-            critic_losses,
-        )
+            # # if self.total_step % plotting_interval == 0:
+        # self._plot(
+            # self.total_step,
+            # scores,
+            # actor_losses,
+            # critic_losses,
+        # )
 
         self.env.close()
 
@@ -464,6 +460,18 @@ class DDPGAgent:
         for loc, title, values in subplot_params:
             subplot(loc, title, values)
         plt.show()
+
+    def save(self, directory, filename):
+        print("Saving model . . .")
+        torch.save(self.actor.state_dict(), '%s/%s_actor.pth' % (directory, filename))
+        torch.save(self.critic.state_dict(), '%s/%s_critic.pth' % (directory, filename))
+
+    def load(self, directory, filename):
+        print("Loading model . . .")
+        self.actor.load_state_dict(torch.load( '%s/%s_actor.pth' % (directory, filename)))
+        self.critic.load_state_dict(torch.load( '%s/%s_critic.pth' % (directory, filename)))
+
+
 
 """## Environment
 *ActionNormalizer* is an action wrapper class to normalize the action values ranged
@@ -546,8 +554,8 @@ agent = DDPGAgent(
 )
 
 agent.train(num_frames, 1000)
+agent.save(directory="./saves", filename="ddpg")
 
-text = input("Training finished. Wanna test?")
-
+agent.load(directory="./saves", filename="ddpg")
 while True:
     agent.test()

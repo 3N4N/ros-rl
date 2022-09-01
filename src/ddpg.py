@@ -298,12 +298,13 @@ class DDPGAgent:
         reward = torch.FloatTensor(samples["rews"].reshape(-1, 1)).to(device)
         done = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
 
-        # FIXME: should mask be used? we return -ve reward for collision anyway.
+        # XXX: should mask be used? we return -ve reward for collision anyway.
+        # Answer: yes, bc these are sampled values, so reward may not be
+        # corresponding to the proper status of done. simply inverting the sign
+        # will do the trick.
         mask = 1 - done
-        # next_action = self.actor_target(next_state)
-        # next_value = self.critic_target(next_state, next_action)
         next_value = self.critic_target(next_state, self.actor_target(next_state))
-        curr_return = reward + self.gamma * next_value #* mask
+        curr_return = reward + self.gamma * next_value * mask
 
         # train critic
         values = self.critic(state, action)

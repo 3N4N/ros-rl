@@ -488,14 +488,14 @@ env.seed(seed)
 """## Initialize"""
 
 # parameters
-num_frames = 5e4
-memory_size = 1e5
+num_frames = 50000
+memory_size = 100000
 batch_size = 128
 ou_noise_theta = 1.0
 ou_noise_sigma = 0.1
 gamma = 0.6
-tau = 1e-1
-initial_random_steps = 1e4
+tau = 0.005
+initial_random_steps = 10000
 
 agent = DDPGAgent(
     env,

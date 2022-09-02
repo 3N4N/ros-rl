@@ -64,7 +64,6 @@ class GazeboAutoVehicleEnv(gym.Env):
         vehicle_pose = states.pose[states.name.index("vehicle")].position
         goal_pose = states.pose[states.name.index("Mailbox")].position
         if vehicle_pose.x > goal_pose.x and vehicle_pose.y > goal_pose.y:
-            print("FINISHED!")
             self.finished = True
 
     def step(self, action):
@@ -111,7 +110,6 @@ class GazeboAutoVehicleEnv(gym.Env):
 
         self.reset_proxy()
         self.finished = False
-        # print("Reset proxy called - reset")
         # self.unpause()
         time.sleep(0.5)
         # self.pause()
@@ -124,7 +122,6 @@ class GazeboAutoVehicleEnv(gym.Env):
         self.prev_state = self.state
         obs = np.asarray([state], dtype=self.observation_space.dtype)
 
-        # print("Returning - reset")
         return obs
 
     def render(self, mode):

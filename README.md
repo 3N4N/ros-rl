@@ -10,15 +10,15 @@ only recognizes straight roads and left and right turns.
 
 1. Build and source the catkin package
 
-  ```
-  catkin_make
-  source devel/setup.bash
-  ```
+    ```
+    catkin_make
+    source devel/setup.bash
+    ```
 
 2. Run the environment and agent
 
-  ```
-  roslaunch driving_track run.launch
-  python src/qlearning.py # or
-  python src/ddpg.py
-  ```
+    ```
+    roslaunch driving_track run.launch
+    python src/qlearning.py # or
+    python src/ddpg.py
+    ```

@@ -3,6 +3,18 @@ DDPG implementation for autonomous vehicle with ROS and Gazebo
 algo source: https://github.com/MrSyee/pg-is-all-you-need
 """
 
+
+# NOTE: The authors of ddpg recommended adding noise
+# to action chosen by the actor nn bc it added randomization.
+# Or so they say.
+# Adding noise made the agent behave erratically *after* it
+# had completed an episode well enough.
+# And we are doing backpropagation anyway. Why do we need
+# *more* randomization?
+# Something smells fishy.
+# As of now I'll not be using any noise.
+# (FYI: Stable Baseline 3 also uses no noise in DDPG by default.)
+
 from util import interuppt_handler
 from envs import GazeboAutoVehicleEnv
 
@@ -374,7 +386,6 @@ class DDPGAgent:
 
         for self.total_step in range(1, num_frames + 1):
             print("STEP:", self.total_step)
-            print("TOTAL SCORES:", scores)
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -465,8 +476,8 @@ class DDPGAgent:
 
     def load(self, directory, filename):
         print("Loading model . . .")
-        self.actor.load_state_dict(torch.load( '%s/%s_actor.pth' % (directory, filename)))
-        self.critic.load_state_dict(torch.load( '%s/%s_critic.pth' % (directory, filename)))
+        self.actor.load_state_dict(torch.load('%s/%s_actor.pth' % (directory, filename)))
+        self.critic.load_state_dict(torch.load('%s/%s_critic.pth' % (directory, filename)))
 
 
 
@@ -544,18 +555,20 @@ agent = DDPGAgent(
     env,
     memory_size,
     batch_size,
-    noise,
-    # None,
+    # noise,
+    None,
     gamma,
     tau,
     initial_random_steps,
-    lr_actor=3e-4,
+    lr_actor=1e-3,
     lr_critic=1e-3
 )
 
-agent.train(num_frames, 1000)
-agent.save(directory="./saves", filename="ddpg")
+model_filename = "ddpg"
 
-agent.load(directory="./saves", filename="ddpg")
+agent.train(num_frames)
+agent.save(directory="./saves", filename=model_filename)
+
+agent.load(directory="./saves", filename=model_filename)
 while True:
     agent.test()

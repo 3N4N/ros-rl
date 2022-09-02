@@ -14,6 +14,10 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+from util import _process_image, interuppt_handler
 
 
 def interuppt_handler(signum, frame):
@@ -23,12 +27,15 @@ def interuppt_handler(signum, frame):
 
 
 def simulate(env, q_table, alpha, epsilon, epsilon_decay):
+    rewards = []
+    avgrewards = []
     try:
         for episode in range(1, MAX_EPISODES):
             print("============= STARTING NEW EPISODE ===============")
 
             state = env.reset()
             total_reward = 0
+            total_steps = 0
 
             if state == None:
                 episode -= 1
@@ -52,6 +59,8 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 print("REWARD: ", reward)
                 print("TOTAL REWARD: ", total_reward)
                 print("EPSILON:", epsilon)
+                # print("REWARDS:", rewards)
+                print("AVG REWARDS:", avgrewards)
                 print("-----------------------------")
 
                 if next_state == None:
@@ -65,14 +74,23 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 print("Best actions:", best_actions)
 
                 state = next_state
+                total_steps += 1
 
             print("Episode %d finished with total reward = %f." % (episode, total_reward))
+            rewards.append(total_reward)
+            avgrewards.append(np.mean(rewards))
 
             if epsilon >= 0.005:
                 epsilon *= epsilon_decay
 
-            if episode % 50 == 0:
-                np.save("qtable-"+str(episode)+".npy", q_table)
+            # if episode % 10 == 0:
+            #     np.save("qtable-"+str(episode)+".npy", q_table)
+            #     np.save("reward-"+str(episode)+".npy", np.array(rewards))
+
+        plt.plot(np.array(avgrewards))
+        plt.xlabel("No. of Episodes")
+        plt.ylabel("Avg. Rewards")
+        plt.show()
 
     except KeyboardInterrupt:
         pass
@@ -84,8 +102,8 @@ class GazeboAutoVehicleEnv():
         self.IMAGE_TOPIC = "/vehicle_camera/image_raw"
         self.CMDVEL_TOPIC = "vehicle/cmd_vel"
         self.GZRESET_TOPIC = "/gazebo/reset_world"
-        self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
-        self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
+        # self.GZPAUSE_TOPIC = '/gazebo/pause_physics'
+        # self.GZUNPAUSE_TOPIC = '/gazebo/unpause_physics'
         self.MODEL_TOPIC = '/gazebo/model_states'
 
         self.H,self.W = H,W
@@ -102,11 +120,23 @@ class GazeboAutoVehicleEnv():
 
         rospy.wait_for_service(self.GZRESET_TOPIC)
         self.reset_proxy = rospy.ServiceProxy(self.GZRESET_TOPIC, Empty)
-        self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
-        self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
+        # self.pause = rospy.ServiceProxy(self.GZPAUSE_TOPIC, Empty)
+        # self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
 
     def image_callback(self, img):
-        self.slope = self._process_image(img)
+        state = _process_image(img, True)
+        if state == None:
+            self.state = None
+            return
+
+        error = state * 90 * (self.W / 180)
+
+        if error <= -20:
+            self.state = 0
+        elif -20 < error < 20:
+            self.state = 1
+        elif error >= 20:
+            self.state = 2
 
     def modelstate_callback(self, states):
         vehicle_pose = states.pose[states.name.index("vehicle")].position
@@ -114,56 +144,6 @@ class GazeboAutoVehicleEnv():
         if vehicle_pose.x > goal_pose.x and vehicle_pose.y > goal_pose.y:
             print("FINISHED!")
             self.finished = True
-
-    def _process_image(self, img):
-        bridge = CvBridge()
-        image = bridge.imgmsg_to_cv2(img, "bgr8")
-        gray = bridge.imgmsg_to_cv2(img, "mono8")
-        _, gray = cv.threshold(gray, 160, 255, cv.THRESH_BINARY);
-
-        clipped = gray[int(self.H*2/3):, :]
-
-        cnt, _, _, centroids = cv.connectedComponentsWithStats(clipped);
-
-        if cnt < 3:
-            return None
-
-        distances = [x[0] - self.W/2 for x in centroids]
-        left_lane = centroids[distances.index(min(distances))]
-        right_lane = centroids[distances.index(max(distances))]
-
-        # print("LANES:", left_lane, right_lane)
-
-        if len(left_lane) == 0 or len(right_lane) == 0 or (left_lane == right_lane).all():
-            return None
-
-        if left_lane[0] < 30 or right_lane[0] > self.W - 30:
-            return None
-
-        goal_x = int((left_lane[0] + right_lane[0]) / 2)
-        goal_y = int((left_lane[1] + right_lane[1]) / 2 + self.H*2/3)
-        error = goal_x - self.W / 2
-
-        if error <= -20:
-            slope = 0
-        elif -20 < error < 20:
-            slope = 1
-        elif error >= 20:
-            slope = 2
-
-
-        pt0 = (int(self.W/2), self.H)
-        pt1 = (goal_x, goal_y)
-        pt2 = (int(self.W/2), goal_y)
-
-        cv.arrowedLine(image, pt0, pt1, (0,255,0), 2, 8, 0, 0.1)
-        cv.arrowedLine(image, pt0, pt2, (255,0,0), 2, 8, 0, 0.1)
-
-        cv.imwrite("image.png", image)
-        cv.imshow("image", image)
-        cv.waitKey(1)
-
-        return slope
 
 
     def step(self, action):
@@ -181,29 +161,29 @@ class GazeboAutoVehicleEnv():
         twist.linear.x = self.speed
         twist.angular.z = self.turn
 
-        self.unpause()
+        # self.unpause()
         self.vel_pub.publish(twist)
-        self.pause()
+        # self.pause()
 
-        slope = self.slope
-        obs = slope
+        state = self.state
+        obs = state
 
         print("-----------------------------")
-        print("SLOPE:", slope)
+        print("STATE:", state)
         print("ACTION:", action)
         print("-----------------------------")
 
-        if slope != None:
+        if state != None:
             done = False
-            if action == self.prev_slope:
-                reward = 10
+            if action == self.prev_state:
+                reward = 1
             else:
-                reward = -10
+                reward = -1
         else:
             done = True
-            reward = -10000
+            reward = -1e2
 
-        self.prev_slope = slope
+        self.prev_state = state
         if self.finished:
             done = True
 
@@ -215,14 +195,16 @@ class GazeboAutoVehicleEnv():
         self.reset_proxy()
         self.finished = False
 
-        self.unpause()
+        # self.unpause()
         time.sleep(1)
-        self.pause()
+        # self.pause()
 
-        slope = self.slope
-        obs = slope
+        state = None
+        while state is None:
+            state = self.state
 
-        self.prev_slope = slope
+        obs = state
+        self.prev_state = state
 
         return obs
 
@@ -233,7 +215,7 @@ if __name__ == "__main__":
 
     env = GazeboAutoVehicleEnv(600, 800)
 
-    MAX_EPISODES = 9999
+    MAX_EPISODES = 100
     epsilon = 1
     epsilon_decay = 0.9
     # epsilon = 0.1

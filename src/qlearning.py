@@ -77,8 +77,8 @@ def simulate(env, q_table, alpha, epsilon, epsilon_decay):
                 total_steps += 1
 
             print("Episode %d finished with total reward = %f." % (episode, total_reward))
-            rewards.append(total_reward)
-            avgrewards.append(np.mean(rewards))
+            rewards.append(total_reward/total_steps)
+            avgrewards.append(np.mean(rewards[-50:]))
 
             if epsilon >= 0.005:
                 epsilon *= epsilon_decay

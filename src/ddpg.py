@@ -15,8 +15,10 @@ algo source: https://github.com/MrSyee/pg-is-all-you-need
 # As of now I'll not be using any noise.
 # (FYI: Stable Baseline 3 also uses no noise in DDPG by default.)
 
-from util import interuppt_handler
 from envs import GazeboAutoVehicleEnv
+from util import interrupt_handler
+from util import ReplayBuffer, ActionNormalizer
+from util import ActionNoise, NormalActionNoise, OUNoise
 
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
@@ -26,9 +28,8 @@ from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
 import signal
-import copy
 import random
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import gym
 import matplotlib.pyplot as plt
@@ -49,125 +50,6 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
-
-class ReplayBuffer:
-    """A simple numpy replay buffer."""
-
-    def __init__(self, obs_dim: int, size: int, batch_size: int = 32):
-        """Initializate."""
-        self.obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.next_obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.acts_buf = np.zeros([size], dtype=np.float32)
-        self.rews_buf = np.zeros([size], dtype=np.float32)
-        self.done_buf = np.zeros([size], dtype=np.float32)
-        self.max_size, self.batch_size = size, batch_size
-        self.ptr, self.size, = 0, 0
-
-    def store(
-        self,
-        obs: np.ndarray,
-        act: np.ndarray,
-        rew: float,
-        next_obs: np.ndarray,
-        done: bool,
-    ):
-        """Store the transition in buffer."""
-        self.obs_buf[self.ptr] = obs
-        self.next_obs_buf[self.ptr] = next_obs
-        self.acts_buf[self.ptr] = act
-        self.rews_buf[self.ptr] = rew
-        self.done_buf[self.ptr] = done
-        self.ptr = (self.ptr + 1) % self.max_size
-        self.size = min(self.size + 1, self.max_size)
-
-    def sample_batch(self) -> Dict[str, np.ndarray]:
-        """Randomly sample a batch of experiences from memory."""
-        idxs = np.random.choice(self.size, size=self.batch_size, replace=False)
-        return dict(obs=self.obs_buf[idxs],
-                    next_obs=self.next_obs_buf[idxs],
-                    acts=self.acts_buf[idxs],
-                    rews=self.rews_buf[idxs],
-                    done=self.done_buf[idxs])
-
-    def __len__(self) -> int:
-        return self.size
-
-
-
-class ActionNoise():
-    """
-    The action noise base class
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def reset(self) -> None:
-        """
-        call end of episode reset for the noise
-        """
-        pass
-
-    def __call__(self) -> np.ndarray:
-        raise NotImplementedError()
-
-
-
-class NormalActionNoise(ActionNoise):
-    """
-    A Gaussian action noise
-
-    :param mean: the mean value of the noise
-    :param sigma: the scale of the noise (std here)
-    """
-
-    def __init__(self, mean: np.ndarray, sigma: np.ndarray):
-        self._mu = mean
-        self._sigma = sigma
-        super().__init__()
-
-    def __call__(self) -> np.ndarray:
-        return self.sample()
-
-    def sample(self) -> np.ndarray:
-        return np.random.normal(self._mu, self._sigma)
-
-
-class OUNoise(ActionNoise):
-    """Ornstein-Uhlenbeck process.
-    Taken from Udacity deep-reinforcement-learning github repository:
-    https://github.com/udacity/deep-reinforcement-learning/blob/master/ddpg-pendulum/ddpg_agent.py
-    """
-
-    def __init__(
-        self,
-        size: int,
-        mu: float = 0.0,
-        theta: float = 0.15,
-        sigma: float = 0.2,
-    ):
-        """Initialize parameters and noise process."""
-        self.state = np.float64(0.0)
-        self.mu = mu * np.ones(size)
-        self.theta = theta
-        self.sigma = sigma
-        self.reset()
-
-    def reset(self):
-        """Reset the internal state (= noise) to mean (mu)."""
-        self.state = copy.copy(self.mu)
-
-    def __call__(self) -> np.ndarray:
-        return self.sample()
-
-    def sample(self) -> np.ndarray:
-        """Update internal state and return it as a noise sample."""
-        x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.array(
-            [random.random() for _ in range(len(x))]
-        )
-        self.state = x + dx
-        return self.state
 
 
 
@@ -296,7 +178,7 @@ class DDPGAgent:
         self.transition = list()
 
         # total steps count
-        self.total_step = 0
+        self.total_steps = 0
 
         # mode: train / test
         self.is_test = False
@@ -304,7 +186,7 @@ class DDPGAgent:
     def select_action(self, state: np.ndarray) -> np.ndarray:
         """Select an action from the input state."""
         # if initial random action should be conducted
-        if self.total_step < self.initial_random_steps and not self.is_test:
+        if self.total_steps < self.initial_random_steps and not self.is_test:
             selected_action = self.env.action_space.sample()
         else:
             selected_action = self.actor(
@@ -383,9 +265,12 @@ class DDPGAgent:
         critic_losses = []
         scores = []
         score = 0
+        episode = 1
 
-        for self.total_step in range(1, num_frames + 1):
-            print("STEP:", self.total_step)
+        for self.total_steps in range(1, num_frames + 1):
+            print("STEP:", self.total_steps)
+            print("EPISODE:", episode)
+
             action = self.select_action(state)
             next_state, reward, done = self.step(action)
 
@@ -397,15 +282,16 @@ class DDPGAgent:
                 state = env.reset()
                 scores.append(score)
                 score = 0
+                episode += 1
 
             # if training is ready
             if (len(self.memory) >= self.batch_size
-                and self.total_step > self.initial_random_steps):
+                and self.total_steps > self.initial_random_steps):
                 actor_loss, critic_loss = self.update_model()
                 actor_losses.append(actor_loss)
                 critic_losses.append(critic_loss)
 
-        self._plot(self.total_step, scores, actor_losses, critic_losses)
+        self._plot(self.total_steps, scores, actor_losses, critic_losses)
 
         self.env.close()
 
@@ -481,43 +367,8 @@ class DDPGAgent:
 
 
 
-"""## Environment
-*ActionNormalizer* is an action wrapper class to normalize the action values ranged
-in (-1. 1). Thanks to this class, we can make the agent simply select action values
-within the zero centered range (-1, 1).
-"""
 
-class ActionNormalizer(gym.ActionWrapper):
-    """Rescale and relocate the actions."""
-
-    def action(self, action: np.ndarray) -> np.ndarray:
-        """Change the range (-1, 1) to (low, high)."""
-        low = self.action_space.low
-        high = self.action_space.high
-
-        scale_factor = (high - low) / 2
-        reloc_factor = high - scale_factor
-
-        action = action * scale_factor + reloc_factor
-        action = np.clip(action, low, high)
-
-        return action
-
-    def reverse_action(self, action: np.ndarray) -> np.ndarray:
-        """Change the range (low, high) to (-1, 1)."""
-        low = self.action_space.low
-        high = self.action_space.high
-
-        scale_factor = (high - low) / 2
-        reloc_factor = high - scale_factor
-
-        action = (action - reloc_factor) / scale_factor
-        action = np.clip(action, -1.0, 1.0)
-
-        return action
-
-
-signal.signal(signal.SIGINT, interuppt_handler)
+signal.signal(signal.SIGINT, interrupt_handler)
 env = GazeboAutoVehicleEnv(600, 800)
 env = ActionNormalizer(env)
 
@@ -535,13 +386,13 @@ seed_torch(seed)
 env.seed(seed)
 
 # parameters
-num_frames = 50000
+num_frames = 1000
 memory_size = 100000
 batch_size = 128
 ou_noise_theta = 1.0
 ou_noise_sigma = 0.1
 gamma = 0.6
-tau = 0.01
+tau = 0.005
 initial_random_steps = 10000
 
 noise = OUNoise(
@@ -560,7 +411,7 @@ agent = DDPGAgent(
     gamma,
     tau,
     initial_random_steps,
-    lr_actor=1e-3,
+    lr_actor=1e-4,
     lr_critic=1e-3
 )
 
@@ -569,6 +420,6 @@ model_filename = "ddpg"
 agent.train(num_frames)
 agent.save(directory="./saves", filename=model_filename)
 
-agent.load(directory="./saves", filename=model_filename)
-while True:
-    agent.test()
+# agent.load(directory="./saves", filename=model_filename)
+# while True:
+#     agent.test()

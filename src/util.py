@@ -1,13 +1,17 @@
 import signal
 import sys
+import numpy as np
+from typing import Dict
+import copy
 
+import gym
 import cv2 as cv
 from cv_bridge import CvBridge, CvBridgeError
 
 
-def interuppt_handler(signum, frame):
+def interrupt_handler(signum, frame):
     print("Signal handler!!!")
-    sys.exit(-2) #Terminate process here as catching the signal removes the close process behaviour of Ctrl-C
+    sys.exit(-2)
 
 
 def _process_image(img, show_image=True):
@@ -56,3 +60,163 @@ def _process_image(img, show_image=True):
         cv.waitKey(1)
 
     return slope/90.0
+
+
+
+class ReplayBuffer:
+    """A simple numpy replay buffer."""
+
+    def __init__(self, obs_dim: int, size: int, batch_size: int = 32):
+        """Initializate."""
+        self.obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.next_obs_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.acts_buf = np.zeros([size], dtype=np.float32)
+        self.rews_buf = np.zeros([size], dtype=np.float32)
+        self.done_buf = np.zeros([size], dtype=np.float32)
+        self.max_size, self.batch_size = size, batch_size
+        self.ptr, self.size, = 0, 0
+
+    def store(
+        self,
+        obs: np.ndarray,
+        act: np.ndarray,
+        rew: float,
+        next_obs: np.ndarray,
+        done: bool,
+    ):
+        """Store the transition in buffer."""
+        self.obs_buf[self.ptr] = obs
+        self.next_obs_buf[self.ptr] = next_obs
+        self.acts_buf[self.ptr] = act
+        self.rews_buf[self.ptr] = rew
+        self.done_buf[self.ptr] = done
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
+
+    def sample_batch(self) -> Dict[str, np.ndarray]:
+        """Randomly sample a batch of experiences from memory."""
+        idxs = np.random.choice(self.size, size=self.batch_size, replace=False)
+        return dict(
+            obs=self.obs_buf[idxs],
+            next_obs=self.next_obs_buf[idxs],
+            acts=self.acts_buf[idxs],
+            rews=self.rews_buf[idxs],
+            done=self.done_buf[idxs]
+        )
+
+    def __len__(self) -> int:
+        return self.size
+
+
+
+class ActionNoise():
+    """
+    The action noise base class
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def reset(self) -> None:
+        """
+        call end of episode reset for the noise
+        """
+        pass
+
+    def __call__(self) -> np.ndarray:
+        raise NotImplementedError()
+
+
+
+class NormalActionNoise(ActionNoise):
+    """
+    A Gaussian action noise
+
+    :param mean: the mean value of the noise
+    :param sigma: the scale of the noise (std here)
+    """
+
+    def __init__(self, mean: np.ndarray, sigma: np.ndarray):
+        self._mu = mean
+        self._sigma = sigma
+        super().__init__()
+
+    def __call__(self) -> np.ndarray:
+        return self.sample()
+
+    def sample(self) -> np.ndarray:
+        return np.random.normal(self._mu, self._sigma)
+
+
+class OUNoise(ActionNoise):
+    """Ornstein-Uhlenbeck process.
+    Taken from Udacity deep-reinforcement-learning github repository:
+    https://github.com/udacity/deep-reinforcement-learning/blob/master/ddpg-pendulum/ddpg_agent.py
+    """
+
+    def __init__(
+        self,
+        size: int,
+        mu: float = 0.0,
+        theta: float = 0.15,
+        sigma: float = 0.2,
+    ):
+        """Initialize parameters and noise process."""
+        self.state = np.float64(0.0)
+        self.mu = mu * np.ones(size)
+        self.theta = theta
+        self.sigma = sigma
+        self.reset()
+
+    def reset(self):
+        """Reset the internal state (= noise) to mean (mu)."""
+        self.state = copy.copy(self.mu)
+
+    def __call__(self) -> np.ndarray:
+        return self.sample()
+
+    def sample(self) -> np.ndarray:
+        """Update internal state and return it as a noise sample."""
+        x = self.state
+        dx = self.theta * (self.mu - x) + self.sigma * np.array(
+            [random.random() for _ in range(len(x))]
+        )
+        self.state = x + dx
+        return self.state
+
+
+
+"""## Environment
+*ActionNormalizer* is an action wrapper class to normalize the action values
+ranged in (-1. 1). Thanks to this class, we can make the agent simply select
+action values within the zero centered range (-1, 1).
+"""
+
+class ActionNormalizer(gym.ActionWrapper):
+    """Rescale and relocate the actions."""
+
+    def action(self, action: np.ndarray) -> np.ndarray:
+        """Change the range (-1, 1) to (low, high)."""
+        low = self.action_space.low
+        high = self.action_space.high
+
+        scale_factor = (high - low) / 2
+        reloc_factor = high - scale_factor
+
+        action = action * scale_factor + reloc_factor
+        action = np.clip(action, low, high)
+
+        return action
+
+    def reverse_action(self, action: np.ndarray) -> np.ndarray:
+        """Change the range (low, high) to (-1, 1)."""
+        low = self.action_space.low
+        high = self.action_space.high
+
+        scale_factor = (high - low) / 2
+        reloc_factor = high - scale_factor
+
+        action = (action - reloc_factor) / scale_factor
+        action = np.clip(action, -1.0, 1.0)
+
+        return action

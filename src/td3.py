@@ -337,7 +337,8 @@ class TD3Agent:
             if (len(self.memory) >= self.batch_size
                 and self.total_steps > self.initial_random_steps):
                 actor_loss, critic_loss = self.update_model()
-                actor_losses.append(actor_loss)
+                if self.total_steps % self.policy_update_freq == 0:
+                    actor_losses.append(actor_loss)
                 critic_losses.append(critic_loss)
 
         self._plot(self.total_steps, scores, actor_losses, critic_losses)

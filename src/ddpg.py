@@ -109,27 +109,6 @@ class Critic(nn.Module):
 
 
 class DDPGAgent:
-    """DDPGAgent interacting with environment.
-
-    Attribute:
-        env (gym.Env): openAI Gym environment
-        actor (nn.Module): target actor model to select actions
-        actor_target (nn.Module): actor model to predict next actions
-        actor_optimizer (Optimizer): optimizer for training actor
-        critic (nn.Module): critic model to predict state values
-        critic_target (nn.Module): target critic model to predict state values
-        critic_optimizer (Optimizer): optimizer for training critic
-        memory (ReplayBuffer): replay memory to store transitions
-        batch_size (int): batch size for sampling
-        gamma (float): discount factor
-        tau (float): parameter for soft target update
-        initial_random_steps (int): initial random action steps
-        noise (OUNoise): noise generator for exploration
-        device (torch.device): cpu / gpu
-        transition (list): temporory storage for the recent transition
-        total_step (int): total step numbers
-        is_test (bool): flag to show the current mode (train / test)
-    """
     def __init__(
         self,
         env: gym.Env,

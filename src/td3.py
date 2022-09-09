@@ -111,35 +111,6 @@ class Critic(nn.Module):
 
 
 class TD3Agent:
-    """TD3Agent interacting with environment.
-
-    Attribute:
-        env (gym.Env): openAI Gym environment
-        actor1 (nn.Module): target actor model to select actions
-        actor2 (nn.Module): target actor model to select actions
-        actor_target1 (nn.Module): actor model to predict next actions
-        actor_target2 (nn.Module): actor model to predict next actions
-        actor_optimizer (Optimizer): optimizer for training actor
-        critic1 (nn.Module): critic model to predict state values
-        critic2 (nn.Module): critic model to predict state values
-        critic_target1 (nn.Module): target critic model to predict state values
-        critic_target2 (nn.Module): target critic model to predict state values
-        critic_optimizer (Optimizer): optimizer for training critic
-        memory (ReplayBuffer): replay memory to store transitions
-        batch_size (int): batch size for sampling
-        gamma (float): discount factor
-        tau (float): parameter for soft target update
-        initial_random_steps (int): initial random action steps
-        exploration_noise (GaussianNoise): gaussian noise for policy
-        target_policy_noise (GaussianNoise): gaussian noise for target policy
-        target_policy_noise_clip (float): clip target gaussian noise
-        device (torch.device): cpu / gpu
-        transition (list): temporory storage for the recent transition
-        policy_update_freq (int): update actor every time critic updates this times
-        total_step (int): total step numbers
-        is_test (bool): flag to show the current mode (train / test)
-    """
-
     def __init__(
         self,
         env: gym.Env,

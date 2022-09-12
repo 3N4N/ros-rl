@@ -334,8 +334,6 @@ class TD3Agent:
         self._plot(self.total_steps, scores, avgscores,
                    actor_losses, critic_losses)
 
-        self.env.close()
-
     def test(self):
         """Test the agent."""
         self.is_test = True
@@ -354,7 +352,6 @@ class TD3Agent:
             score += reward
 
         print("score: ", score)
-        self.env.close()
 
         return frames
 
@@ -452,18 +449,18 @@ env = ActionNormalizer(env)
 env.seed(seed)
 
 
-model_filename = "td3_3"
+model_filename = "td3_1"
 
 agent = TD3Agent(
     env,
     memory_size = 100000,
     batch_size = 128,
     gamma = 0.9,
-    tau = 0.05,
+    tau = 0.1,
     policy_update_freq = 2,
     initial_random_steps = 10000,
     lr_actor = 1e-4,
-    lr_critic = 1e-3,
+    lr_critic = 3e-4,
     wd_actor = 0,
     model_filename = model_filename
 )

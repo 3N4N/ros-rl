@@ -124,7 +124,9 @@ class TD3Agent:
         policy_update_freq: int = 2,
         initial_random_steps: int = int(1e4),
         lr_actor: float = 3e-4,
-        lr_critic: float = 1e-3
+        lr_critic: float = 1e-3,
+        wd_actor: float = 1e-2,
+        model_filename: str = "td3"
     ):
         """Initialize."""
         obs_dim = env.observation_space.shape[0]
@@ -165,9 +167,7 @@ class TD3Agent:
         self.critic_target2.load_state_dict(self.critic2.state_dict())
 
         # concat critic parameters to use one optim
-        critic_parameters = list(self.critic1.parameters()) + list(
-            self.critic2.parameters()
-        )
+        critic_parameters = list(self.critic1.parameters()) + list(self.critic2.parameters())
 
         # optimizer
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr_actor)
@@ -184,6 +184,10 @@ class TD3Agent:
 
         # mode: train / test
         self.is_test = False
+
+        self.max_score = float('-inf')
+        self.model_filename = model_filename
+        self.start_storing = False
 
     def select_action(self, state: np.ndarray) -> np.ndarray:
         """Select an action from the input state."""
@@ -300,13 +304,23 @@ class TD3Agent:
             # if episode ends
             if done:
                 state = self.env.reset()
-                scores.append(score)
+                if self.start_storing:
+                    scores.append(score)
+                if score > self.max_score and self.start_storing:
+                    self.save(directory="./saves",
+                              filename=self.model_filename+"_"+str(episode))
+                    self.max_score = score
+
                 score = 0
                 episode += 1
+                prev_episode_steps = self.total_steps
+
+                if (not self.start_storing
+                    and self.total_steps > self.initial_random_steps):
+                    self.start_storing = True
 
             # if training is ready
-            if (len(self.memory) >= self.batch_size
-                and self.total_steps > self.initial_random_steps):
+            if len(self.memory) >= self.batch_size and self.start_storing:
                 actor_loss, critic_loss = self.update_model()
                 if self.total_steps % self.policy_update_freq == 0:
                     actor_losses.append(actor_loss)
@@ -430,30 +444,27 @@ env = ActionNormalizer(env)
 env.seed(seed)
 
 
-# parameters
-num_frames = 50000
-memory_size = 100000
-batch_size = 128
-gamma = 0.6
-tau = 0.005
-initial_random_steps = 10000
+model_filename = "td3_3"
 
 agent = TD3Agent(
     env,
-    memory_size,
-    batch_size,
-    gamma,
-    tau,
-    initial_random_steps = initial_random_steps,
+    memory_size = 100000,
+    batch_size = 128,
+    gamma = 0.9,
+    tau = 0.05,
+    policy_update_freq = 2,
+    initial_random_steps = 10000,
     lr_actor = 1e-4,
-    lr_critic = 1e-3
+    lr_critic = 1e-3,
+    wd_actor = 0,
+    model_filename = model_filename
 )
 
-model_filename = "td3_1"
 
-agent.train(num_frames)
+agent.train(num_frames = 50000)
 agent.save(directory="./saves", filename=model_filename)
 
+# model_filename += "_7"
 # agent.load(directory="./saves", filename=model_filename)
 # while True:
 #     agent.test()

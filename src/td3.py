@@ -368,14 +368,10 @@ class TD3Agent():
     def save(self, directory, filename):
         print("Saving model . . .")
         torch.save(self.actor.state_dict(), '%s/%s_actor.pth' % (directory, filename))
-        torch.save(self.critic1.state_dict(), '%s/%s_critic1.pth' % (directory, filename))
-        torch.save(self.critic2.state_dict(), '%s/%s_critic2.pth' % (directory, filename))
 
     def load(self, directory, filename):
         print("Loading model . . .")
         self.actor.load_state_dict(torch.load('%s/%s_actor.pth' % (directory, filename)))
-        self.critic1.load_state_dict(torch.load('%s/%s_critic1.pth' % (directory, filename)))
-        self.critic2.load_state_dict(torch.load('%s/%s_critic2.pth' % (directory, filename)))
 
 """## Environment
 *ActionNormalizer* is an action wrapper class to normalize the action values

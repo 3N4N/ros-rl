@@ -40,33 +40,6 @@ random.seed(seed)
 
 
 
-class GaussianNoise:
-    """Gaussian Noise.
-    Taken from https://github.com/vitchyr/rlkit
-    """
-
-    def __init__(
-        self,
-        action_dim: int,
-        min_sigma: float = 1.0,
-        max_sigma: float = 1.0,
-        decay_period: int = 1000000,
-    ):
-        """Initialize."""
-        self.action_dim = action_dim
-        self.max_sigma = max_sigma
-        self.min_sigma = min_sigma
-        self.decay_period = decay_period
-
-    def sample(self, t: int = 0) -> float:
-        """Get an action with gaussian noise."""
-        sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(
-            1.0, t / self.decay_period
-        )
-        return np.random.normal(0, sigma, size=self.action_dim)
-
-
-
 class Actor(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, init_w: float = 3e-3):
         super(Actor, self).__init__()
@@ -138,16 +111,14 @@ class TD3Agent():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
 
-        # noise
-        self.exploration_noise = GaussianNoise(
-            action_dim, exploration_noise, exploration_noise
+        self.exploration_noise = NormalActionNoise(
+            0, exploration_noise, action_dim
         )
-        self.target_policy_noise = GaussianNoise(
-            action_dim, target_policy_noise, target_policy_noise
+        self.target_policy_noise = NormalActionNoise(
+            0, target_policy_noise, action_dim
         )
         self.target_policy_noise_clip = target_policy_noise_clip
 
-        # networks
         self.actor = Actor(obs_dim, action_dim).to(self.device)
         self.actor_target = Actor(obs_dim, action_dim).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
@@ -187,10 +158,11 @@ class TD3Agent():
             )
 
         if not self.is_test:
-            noise = self.exploration_noise.sample()
-            selected_action = np.clip(
-                selected_action + noise, -1.0, 1.0
-            )
+            if self.exploration_noise is not None:
+                noise = self.exploration_noise.sample()
+                selected_action = np.clip(
+                    selected_action + noise, -1.0, 1.0
+                )
 
             self.transition = [state, selected_action]
 
@@ -216,12 +188,15 @@ class TD3Agent():
         dones = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
         masks = 1 - dones
 
-        noise = torch.FloatTensor(self.target_policy_noise.sample()).to(device)
-        clipped_noise = torch.clamp(
-            noise, -self.target_policy_noise_clip, self.target_policy_noise_clip
-        )
+        next_actions = self.actor_target(next_states)
 
-        next_actions = (self.actor_target(next_states) + clipped_noise).clamp(-1.0, 1.0)
+        if self.target_policy_noise is not None:
+            noise = torch.clamp(
+                torch.FloatTensor(self.target_policy_noise.sample()).to(device),
+                -self.target_policy_noise_clip,
+                self.target_policy_noise_clip
+            )
+            next_actions = (next_actions + noise).clamp(-1.0, 1.0)
 
         # min (Q_1', Q_2')
         next_values1 = self.critic_target1(next_states, next_actions)

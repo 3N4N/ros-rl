@@ -136,16 +136,17 @@ class NormalActionNoise(ActionNoise):
     :param sigma: the scale of the noise (std here)
     """
 
-    def __init__(self, mean: np.ndarray, sigma: np.ndarray):
+    def __init__(self, mean: np.ndarray, sigma: np.ndarray, shape: int):
         self._mu = mean
         self._sigma = sigma
+        self._shape = shape
         super().__init__()
 
     def __call__(self) -> np.ndarray:
         return self.sample()
 
     def sample(self) -> np.ndarray:
-        return np.random.normal(self._mu, self._sigma)
+        return np.random.normal(self._mu, self._sigma, self._shape)
 
 
 class OUNoise(ActionNoise):

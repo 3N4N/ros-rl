@@ -412,7 +412,6 @@ class ActionNormalizer(gym.ActionWrapper):
 signal.signal(signal.SIGINT, interrupt_handler)
 env = GazeboAutoVehicleEnv(600, 800)
 env = ActionNormalizer(env)
-env.seed(seed)
 
 
 model_filename = "td3_1"

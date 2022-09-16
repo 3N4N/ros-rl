@@ -38,12 +38,18 @@ class GazeboAutoVehicleEnv(gym.Env):
         self.H,self.W = H,W
         self.finished = False
 
-        self.action_space = gym.spaces.Box(np.array([-1]),
-                                           np.array([1]),
+        # self.action_space = gym.spaces.Box(np.array([-1]),
+        #                                    np.array([1]),
+        #                                    dtype=np.float32)
+
+        self.action_space = gym.spaces.Box(np.array([-1, 0.5]),
+                                           np.array([1, 1.0]),
                                            dtype=np.float32)
+
         self.observation_space = gym.spaces.Box(np.array([-1]),
                                                 np.array([1]),
                                                 dtype=np.float32)
+
         rospy.init_node('gym', anonymous=True)
         rospy.Subscriber(self.IMAGE_TOPIC, Image, self.image_callback)
         rospy.Subscriber(self.MODEL_TOPIC, ModelStates, self.modelstate_callback)
@@ -67,10 +73,9 @@ class GazeboAutoVehicleEnv(gym.Env):
             self.finished = True
 
     def step(self, action):
-        action = action[0].item()
-
         self.speed = 0.5
-        self.turn = action
+        self.turn = action[0].item()
+        self.speed = action[1].item()
 
         twist = Twist()
         twist.linear.x = self.speed
@@ -84,7 +89,7 @@ class GazeboAutoVehicleEnv(gym.Env):
 
         if state != None:
             done = False
-            reward = 1 - abs(state)
+            reward = 1 - abs(state) + self.speed
         else:
             done = True
             reward = -1
@@ -93,6 +98,9 @@ class GazeboAutoVehicleEnv(gym.Env):
 
         if self.finished:
             done = True
+
+        if done:
+            self.state = None
 
         print("-----------------------------")
         print("STATE:", state)

@@ -101,7 +101,7 @@ class TD3Agent():
         action_dim = env.action_space.shape[0]
 
         self.env = env
-        self.memory = ReplayBuffer(obs_dim, memory_size, batch_size)
+        self.memory = ReplayBuffer(obs_dim, action_dim, memory_size, batch_size)
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
@@ -183,9 +183,9 @@ class TD3Agent():
         samples = self.memory.sample_batch()
         states = torch.FloatTensor(samples["obs"]).to(device)
         next_states = torch.FloatTensor(samples["next_obs"]).to(device)
-        actions = torch.FloatTensor(samples["acts"].reshape(-1, 1)).to(device)
-        rewards = torch.FloatTensor(samples["rews"].reshape(-1, 1)).to(device)
-        dones = torch.FloatTensor(samples["done"].reshape(-1, 1)).to(device)
+        actions = torch.FloatTensor(samples["acts"]).to(device)
+        rewards = torch.FloatTensor(samples["rews"]).to(device)
+        dones = torch.FloatTensor(samples["done"]).to(device)
         masks = 1 - dones
 
         next_actions = self.actor_target(next_states)

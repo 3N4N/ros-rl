@@ -407,7 +407,6 @@ agent = TD3Agent(
 
 
 agent.train(num_frames = 50000)
-agent.save(directory="./saves", filename=model_filename)
 
 # model_filename += "_7"
 # agent.load(directory="./saves", filename=model_filename)

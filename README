@@ -39,6 +39,12 @@ o Q-Learning complete
   consistently and performs as desired.
 
 o DDPG outdated
-  Currently DDPG implementation is out-of-date with the utils. TD3 is
-  the main focus now. Once it's finished, DDPG will be updated to
-  accommodate the changes made in utils.
+  Currently DDPG implementation is out-of-date with the utils and
+  envs. TD3 is the main focus now. Once it's finished, DDPG will be
+  updated to accommodate the changes made in utils and envs.
+
+o Two-dimensional action space
+  As of now TD3 can't train using (turn,speed) as action space. It
+  didn't converge for 1d action space (turn) either, but in some
+  episodes it resulted in good-enough returns. 2d action space should
+  work, too. Probably needs hyperparam tuning.

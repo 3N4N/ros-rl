@@ -385,7 +385,7 @@ class ActionNormalizer(gym.ActionWrapper):
 
 
 signal.signal(signal.SIGINT, interrupt_handler)
-env = GazeboAutoVehicleEnv(600, 800)
+env = GazeboAutoVehicleEnv(600, 800, 2, 1)
 env = ActionNormalizer(env)
 
 

@@ -21,14 +21,14 @@ How to run
 
 3. Set up a python environment for RL
 
-    pip install -r requirements.txt
     source venv/bin/activate
+    pip install -r requirements.txt
 
 4. Run the agent
 
     python src/qlearning.py # or
     python src/ddpg.py      # or
-    python src/td3
+    python src/td3.py
 
 
 Remarks

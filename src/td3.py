@@ -8,13 +8,6 @@ from util import interrupt_handler
 from util import ReplayBuffer, ActionNormalizer
 from util import ActionNoise, NormalActionNoise, OUNoise
 
-import rospy
-from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image
-from gazebo_msgs.msg import ModelStates
-from geometry_msgs.msg import Twist
-from std_srvs.srv import Empty
-
 import signal
 import random
 from typing import List, Tuple
@@ -332,7 +325,6 @@ class TD3Agent():
         actor_losses: List[float],
         critic_losses: List[float],
     ):
-
         fig, ax = plt.subplots(3, 1, figsize=(30, 15))
         ax[0].plot(scores)
         ax[0].plot(avgscores)
@@ -411,4 +403,5 @@ agent.train(num_frames = 50000)
 # model_filename += "_7"
 # agent.load(directory="./saves", filename=model_filename)
 # while True:
+#     env.use_pause = False
 #     agent.test()

@@ -20,13 +20,6 @@ from util import interrupt_handler
 from util import ReplayBuffer, ActionNormalizer
 from util import ActionNoise, NormalActionNoise, OUNoise
 
-import rospy
-from cv_bridge import CvBridge, CvBridgeError
-from sensor_msgs.msg import Image
-from gazebo_msgs.msg import ModelStates
-from geometry_msgs.msg import Twist
-from std_srvs.srv import Empty
-
 import signal
 import random
 from typing import List, Tuple

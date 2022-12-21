@@ -1,20 +1,19 @@
-import signal
 import sys
+import random
 import numpy as np
 from typing import Dict
 import copy
 
 import gym
 import cv2 as cv
-from cv_bridge import CvBridge, CvBridgeError
+from cv_bridge import CvBridge
 
 
-def interrupt_handler(signum, frame):
-    print("Signal handler!!!")
+def interuppt_handler(signum, frame):
+    print("Signal handler!!!", signum, frame)
     sys.exit(-2)
 
-
-def _process_image(img, show_image=True):
+def process_image(img, show_image=True):
     bridge = CvBridge()
     image = bridge.imgmsg_to_cv2(img, "bgr8")
     gray = bridge.imgmsg_to_cv2(img, "mono8")

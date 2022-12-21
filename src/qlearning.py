@@ -2,13 +2,10 @@ import gym
 import random
 import time
 import signal
-import sys
 
 import numpy as np
-import cv2 as cv
 
 import rospy
-from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image
 from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
@@ -17,13 +14,7 @@ from std_srvs.srv import Empty
 import numpy as np
 import matplotlib.pyplot as plt
 
-from util import _process_image, interuppt_handler
-
-
-def interuppt_handler(signum, frame):
-    print("Signal handler!!!")
-    sys.exit(-2) #Terminate process here as catching the signal removes the close process behaviour of Ctrl-C
-
+from util import process_image, interuppt_handler
 
 
 def simulate(env, q_table, alpha, epsilon, epsilon_decay):
@@ -124,7 +115,7 @@ class GazeboAutoVehicleEnv():
         # self.unpause = rospy.ServiceProxy(self.GZUNPAUSE_TOPIC, Empty)
 
     def image_callback(self, img):
-        state = _process_image(img, True)
+        state = process_image(img, True)
         if state == None:
             self.state = None
             return

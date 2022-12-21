@@ -1,11 +1,6 @@
-import signal
-import sys
 import time
 import gym
 import numpy as np
-import cv2 as cv
-
-
 
 import rospy
 from sensor_msgs.msg import Image
@@ -13,8 +8,7 @@ from gazebo_msgs.msg import ModelStates
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Empty
 
-
-from util import _process_image
+from util import process_image
 
 import gym
 import numpy as np
@@ -45,8 +39,8 @@ class GazeboAutoVehicleEnv(gym.Env):
                                                np.array([1]),
                                                dtype=np.float32)
         else:
-            self.action_space = gym.spaces.Box(np.array([-1, 1.0]),
-                                               np.array([1, 1.5]),
+            self.action_space = gym.spaces.Box(np.array([-1, 0.3]),
+                                               np.array([1, 0.7]),
                                                dtype=np.float32)
 
         self.observation_space = gym.spaces.Box(np.array([-1]),
@@ -66,7 +60,7 @@ class GazeboAutoVehicleEnv(gym.Env):
         self.state = None
 
     def image_callback(self, img):
-        self.state = _process_image(img, False)
+        self.state = process_image(img, False)
         pass
 
     def modelstate_callback(self, states):
